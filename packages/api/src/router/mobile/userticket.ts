@@ -6,7 +6,17 @@ import { TRPCError } from "@trpc/server";
 import { dayjs } from "../../lib/utils";
 
 export const userTicketRouter = createTRPCRouter({
-  /** Todos los tickets del usuario con giftId. Fuente única para separar active/gifted en frontend. */
+  /**
+   * Todos los tickets visibles para un usuario:
+   *   1. Tickets que ya son suyos (ownerId = userId), incluyendo transferencias aceptadas.
+   *   2. Tickets PENDIENTES de regalo donde él es el receptor (gift.giftReceiverId = userId),
+   *      aunque ownerId siga siendo el emisor hasta la aceptación.
+   *
+   * Campos extra en la respuesta:
+   *   · isSentGift       — yo soy el emisor del regalo pendiente
+   *   · isIncomingGift   — yo soy el receptor del regalo pendiente (aún no acepté)
+   *   · giftSenderName/Image — quién me lo regaló (pendiente o aceptado)
+   */
   list: publicProcedure.input(z.object({
     userId: z.string()
   })).query(async ({ ctx, input }) => {
@@ -17,15 +27,27 @@ export const userTicketRouter = createTRPCRouter({
     if (!user) {
       throw new TRPCError({ code: 'CONFLICT', message: 'Ocurrió un error' })
     }
+
     const rows = await ctx.prisma.userTicket.findMany({
       where: {
-        ownerId: input.userId,
-        status: 'PENDING',
         discharged: true,
+        status: 'PENDING',
+        OR: [
+          // Mis tickets (propios + transferidos tras aceptar regalo)
+          { ownerId: input.userId },
+          // Regalos pendientes donde soy el receptor (ticket aún con el emisor)
+          {
+            gift: {
+              giftReceiverId: input.userId,
+              status: 'PENDING',
+            },
+          },
+        ],
       },
       select: {
         id: true,
         giftId: true,
+        ownerId: true,
         ticket: {
           select: {
             id: true,
@@ -42,41 +64,72 @@ export const userTicketRouter = createTRPCRouter({
             }
           }
         },
+        // Regalo activo (via giftId): el registro Gift que "bloquea" este ticket
         gift: {
           select: {
             id: true,
             status: true,
             giftRequesterId: true,
+            giftRequester: { select: { id: true, name: true, image: true } },
+            giftReceiverId: true,
             giftReceiver: { select: { id: true, name: true, image: true } },
           }
         },
+        // Historial de transferencias aceptadas hacia mí (para "Recibido de" post-aceptación)
+        gifts: {
+          where: {
+            status: 'ACCEPTED',
+            giftReceiverId: input.userId,
+          },
+          select: {
+            giftRequester: { select: { id: true, name: true, image: true } },
+          },
+          take: 1,
+        },
       }
     })
-    const tickets = rows.map(t => ({
-      id: t.id,
-      userTicketId: t.id,
-      giftId: t.giftId ?? null,
-      url: t.id,
-      quantity: 1,
-      eventTicket: {
-        id: t.ticket.id,
-        name: t.ticket.name,
-        locatioName: t.ticket.event.location?.name ?? 'Ubicación',
-        event: {
-          id: t.ticket.event.id,
-          name: t.ticket.event.name,
-          image: t.ticket.event.image ?? 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Placeholder_view_vector.svg/1200px-Placeholder_view_vector.svg.png',
-          startsAt: t.ticket.event.startsAt,
-          endsAt: t.ticket.event.endsAt,
+
+    const tickets = rows.map(t => {
+      const isIncomingGift = t.giftId != null && t.gift?.giftReceiverId === input.userId
+      const isSentGift     = t.giftId != null && t.gift?.giftRequesterId === input.userId
+
+      // Quién me envió el regalo: pendiente (gift.giftRequester) o ya aceptado (gifts[])
+      const senderInfo = isIncomingGift
+        ? (t.gift?.giftRequester ?? null)
+        : (t.gifts[0]?.giftRequester ?? null)
+
+      return {
+        id: t.id,
+        userTicketId: t.id,
+        giftId: t.giftId ?? null,
+        url: t.id,
+        quantity: 1,
+        isSentGift,
+        isIncomingGift,
+        giftSenderName:  senderInfo?.name  ?? null,
+        giftSenderImage: senderInfo?.image ?? null,
+        eventTicket: {
+          id: t.ticket.id,
+          name: t.ticket.name,
+          locatioName: t.ticket.event.location?.name ?? 'Ubicación',
+          event: {
+            id: t.ticket.event.id,
+            name: t.ticket.event.name,
+            image: t.ticket.event.image ?? 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Placeholder_view_vector.svg/1200px-Placeholder_view_vector.svg.png',
+            startsAt: t.ticket.event.startsAt,
+            endsAt: t.ticket.event.endsAt,
+          },
         },
-      },
-      gift: t.gift ? {
-        id: t.gift.id,
-        status: t.gift.status,
-        giftRequesterId: t.gift.giftRequesterId,
-        giftReceiver: t.gift.giftReceiver,
-      } : null,
-    }))
+        gift: t.gift ? {
+          id: t.gift.id,
+          status: t.gift.status,
+          giftRequesterId: t.gift.giftRequesterId,
+          giftRequester: t.gift.giftRequester,
+          giftReceiver: t.gift.giftReceiver,
+        } : null,
+      }
+    })
+
     return tickets
   }),
 

@@ -38,11 +38,23 @@ const getBaseUrl = () => {
 };
 
 /**
+ * Referencia estable al QueryClient activo.
+ * Útil para limpiar la caché desde fuera del árbol de React (ej: signOut en auth.tsx).
+ * Se asigna en el useState initializer de TRPCProvider, por lo que siempre está definido
+ * antes de cualquier interacción del usuario.
+ */
+export let sharedQueryClient: QueryClient
+
+/**
  * A wrapper for your app that provides the TRPC context.
  * Use only in _layout.tsx
  */
 export function TRPCProvider(props: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => {
+    const client = new QueryClient()
+    sharedQueryClient = client
+    return client
+  });
   const [trpcClient] = useState(() =>
     api.createClient({
       links: [

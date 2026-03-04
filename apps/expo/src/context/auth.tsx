@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { removeStoreData } from '~/lib/storage';
 import { useStorageState } from '~/hooks/useStorageState';
+import { sharedQueryClient } from '~/utils/api';
 
 interface SignInPayload {
     user: AuthenticatedUser
@@ -58,10 +59,12 @@ export function SessionProvider(props: React.PropsWithChildren) {
             signOut: () => {
                 setUser(null);
                 setSession(null);
-                // Also clear the AsyncStorage keys that index.tsx / login.tsx
-                // write so cold-start validation doesn't resurface a stale session.
+                // Limpiar AsyncStorage para que cold-start no restaure la sesión anterior
                 void removeStoreData('session');
                 void removeStoreData('user');
+                // Limpiar caché de React Query para evitar datos del usuario anterior
+                // al iniciar sesión con una cuenta diferente
+                sharedQueryClient?.clear();
             },
             session,
             user,

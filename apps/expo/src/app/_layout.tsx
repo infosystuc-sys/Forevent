@@ -16,12 +16,13 @@ import { StyleSheet } from "react-native";
 import { SplashScreen } from "expo-router";
 import { Animated } from "react-native";
 import * as SecureStore from 'expo-secure-store';
-import {
-  useFonts,
-  Montserrat_700Bold,
-  Montserrat_800ExtraBold,
-} from '@expo-google-fonts/montserrat';
+import * as Font from 'expo-font';
 import WelcomeScreen, { HIDE_WELCOME_KEY } from "~/components/WelcomeScreen";
+
+const FONTS = {
+  Montserrat_700Bold: require('../assets/fonts/Montserrat_700Bold.ttf'),
+  Montserrat_800ExtraBold: require('../assets/fonts/Montserrat_800ExtraBold.ttf'),
+} as const;
 
 export function SplashVideo({ onLoaded, onFinish }: { onLoaded: () => void, onFinish: () => void }) {
   const video = useRef(null);
@@ -141,17 +142,27 @@ function WelcomeGate({ children }: { children: React.ReactNode }) {
 // It wraps your pages with the providers they need
 export default function RootLayout() {
   const { colorScheme } = useColorScheme();
-  const [fontsLoaded] = useFonts({
-    Montserrat_700Bold,
-    Montserrat_800ExtraBold,
-  });
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    Font.loadAsync(FONTS)
+      .then(() => setFontsLoaded(true))
+      .catch((err) => {
+        console.warn('[Fonts] Error loading fonts:', err);
+        setFontsLoaded(true);
+      });
+  }, []);
+
+  // Block any render until fonts are confirmed loaded — prevents the
+  // "Unrecognized font family 'Montserrat_800ExtraBold'" warning on Android.
+  if (!fontsLoaded) return null;
 
   return (
     <TRPCProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SessionProvider>
           <ThemeProvider value={DarkTheme}>
-            <AnimatedSplashScreen fontsLoaded={fontsLoaded ?? false}>
+            <AnimatedSplashScreen fontsLoaded={fontsLoaded}>
               <WelcomeGate>
                 <Slot />
               </WelcomeGate>
@@ -160,6 +171,6 @@ export default function RootLayout() {
         </SessionProvider>
         <StatusBar />
       </GestureHandlerRootView>
-    </TRPCProvider >
+    </TRPCProvider>
   );
 }

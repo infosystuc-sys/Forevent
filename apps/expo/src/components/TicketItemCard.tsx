@@ -4,6 +4,12 @@
  * Regla de oro: NUNCA usa variables externas o acumuladores para determinar si un
  * ticket es regalo. Toda la lógica se calcula DENTRO de este componente usando
  * únicamente la prop `ticket`.
+ *
+ * Tipos de ticket:
+ *   · Normal propio    — giftId=null, isSentGift=false, isIncomingGift=false
+ *   · Regalo enviado   — isSentGift=true   → "Enviaste este ticket como regalo"
+ *   · Regalo pendiente — isIncomingGift=true → "Recibido de [Nombre] · Pendiente"
+ *   · Regalo aceptado  — giftId=null, giftSenderName != null → "Recibido de [Nombre]" + botón entrada
  */
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
@@ -18,6 +24,7 @@ const C = {
   magenta: '#ff00ff',
   purple:  '#411377',
   amber:   '#f59e0b',
+  cyan:    '#22d3ee',
   white:   '#ffffff',
   dim:     'rgba(255,255,255,0.50)',
 }
@@ -34,6 +41,14 @@ export type TicketItem = {
     event: { name: string; image: string; startsAt: Date; endsAt: Date }
   }
   giftId?: string | null
+  /** true si soy el emisor del regalo (pending) */
+  isSentGift?: boolean
+  /** true si soy el receptor del regalo y aún está pendiente de aceptación */
+  isIncomingGift?: boolean
+  /** Nombre del amigo que me regaló este ticket (pending o aceptado) */
+  giftSenderName?: string | null
+  /** Imagen del amigo que me regaló este ticket */
+  giftSenderImage?: string | null
 }
 
 type Props = {
@@ -44,8 +59,12 @@ type Props = {
 }
 
 export function TicketItemCard({ ticket, onPress, cardWidth, styles }: Props) {
-  const isActuallyGifted = !!ticket.giftId
-  const isActive = !isActuallyGifted
+  const isSentGift     = !!ticket.isSentGift
+  const isIncomingGift = !!ticket.isIncomingGift
+  // Regalo aceptado: ya está en mi cuenta (giftId=null) pero vino de alguien
+  const isAcceptedGift = !ticket.giftId && !!ticket.giftSenderName && !isSentGift && !isIncomingGift
+  // Puede entrar al evento: ticket propio (normal o aceptado como regalo)
+  const canEnter       = !isSentGift && !isIncomingGift
 
   const dateLabel = ticket.eventTicket.event.startsAt
     ? dayjs(ticket.eventTicket.event.startsAt)
@@ -54,9 +73,12 @@ export function TicketItemCard({ ticket, onPress, cardWidth, styles }: Props) {
         .replace(/^\w/, (c) => c.toUpperCase())
     : '—'
 
+  // Color de borde según estado
+  const borderStyle = isSentGift || isIncomingGift ? styles.cardGiftBlocking : undefined
+
   return (
     <Pressable
-      style={[styles.card, { width: cardWidth }, isActuallyGifted && styles.cardGiftBlocking]}
+      style={[styles.card, { width: cardWidth }, borderStyle]}
       onPress={onPress}
       android_ripple={{ color: 'rgba(255,255,255,0.06)' }}
     >
@@ -76,8 +98,9 @@ export function TicketItemCard({ ticket, onPress, cardWidth, styles }: Props) {
         pointerEvents="none"
       />
 
-      <View style={[styles.qtyBadge, isActuallyGifted && styles.qtyBadgeGift]}>
-        {isActive ? (
+      {/* Badge cantidad: magenta para tickets propios, ámbar para cualquier estado de regalo */}
+      <View style={[styles.qtyBadge, (isSentGift || isIncomingGift) && styles.qtyBadgeGift]}>
+        {canEnter && !isAcceptedGift ? (
           <LinearGradient
             colors={[C.magenta, C.purple]}
             start={{ x: 0, y: 0 }}
@@ -91,7 +114,11 @@ export function TicketItemCard({ ticket, onPress, cardWidth, styles }: Props) {
           </LinearGradient>
         ) : (
           <View style={styles.qtyBadgeGiftInner}>
-            <MaterialCommunityIcons name="gift-outline" size={14} color={C.amber} />
+            <MaterialCommunityIcons
+              name={isIncomingGift ? 'gift-open-outline' : 'gift-outline'}
+              size={14}
+              color={C.amber}
+            />
             <Text style={[styles.qtyBadgeText, { color: C.amber }]}>
               {ticket.quantity > 1 ? `x${ticket.quantity}` : '1'}
             </Text>
@@ -123,20 +150,48 @@ export function TicketItemCard({ ticket, onPress, cardWidth, styles }: Props) {
         </View>
 
         <View style={styles.cardCta}>
-          {isActive ? (
+          {isSentGift ? (
+            /* Regalo que yo envié y está pendiente de aceptación */
             <>
-              <Text style={styles.cardCtaText}>Ver QR</Text>
+              <Text style={[styles.cardCtaText, { color: C.amber }]}>
+                Enviaste este ticket como regalo
+              </Text>
+              <MaterialCommunityIcons name="gift-outline" size={14} color={C.amber} />
+            </>
+          ) : isIncomingGift ? (
+            /* Regalo pendiente que me enviaron — aún no acepté */
+            <>
+              <Text style={[styles.cardCtaText, { color: C.amber }]}>
+                Recibido de{' '}
+                <Text style={{ fontWeight: '700', color: C.white }}>
+                  {ticket.giftSenderName ?? '—'}
+                </Text>
+                {' · '}Pendiente de aceptación
+              </Text>
+              <MaterialCommunityIcons name="gift-open-outline" size={14} color={C.amber} />
+            </>
+          ) : isAcceptedGift ? (
+            /* Regalo aceptado — ya puedo usarlo */
+            <>
+              <Text style={[styles.cardCtaText, { color: C.cyan }]}>
+                Recibido de{' '}
+                <Text style={{ fontWeight: '700', color: C.white }}>
+                  {ticket.giftSenderName}
+                </Text>
+              </Text>
               <View style={styles.enterBtnWrapper}>
                 <Text style={styles.enterBtnText}>ENTRAR AL EVENTO</Text>
                 <MaterialCommunityIcons name="arrow-right" size={16} color={C.magenta} />
               </View>
             </>
           ) : (
+            /* Ticket propio normal */
             <>
-              <Text style={[styles.cardCtaText, { color: C.amber }]}>
-                Enviaste este ticket como regalo
-              </Text>
-              <MaterialCommunityIcons name="gift-outline" size={14} color={C.amber} />
+              <Text style={styles.cardCtaText}>Ver QR</Text>
+              <View style={styles.enterBtnWrapper}>
+                <Text style={styles.enterBtnText}>ENTRAR AL EVENTO</Text>
+                <MaterialCommunityIcons name="arrow-right" size={16} color={C.magenta} />
+              </View>
             </>
           )}
         </View>

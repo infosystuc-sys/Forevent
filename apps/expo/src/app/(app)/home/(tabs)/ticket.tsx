@@ -188,7 +188,12 @@ export default function Page() {
   const utils = api.useUtils()
   const ticketsQuery = api.mobile.userTicket.list.useQuery(
     { userId: user!.id },
-    { staleTime: 0 }
+    {
+      staleTime: 0,
+      // Siempre re-fetcha al montar (cubre cambios de cuenta y aceptaciones recientes)
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true,
+    }
   )
 
   const isRefreshing = ticketsQuery.isFetching
@@ -197,14 +202,24 @@ export default function Page() {
     ticketsQuery.refetch()
   }
 
-  // giftId es la ÚNICA fuente de verdad para separar tickets
   const allTickets = ticketsQuery.data ?? []
-  const activeTickets = allTickets.filter((t) => t.giftId == null)
-  const giftedTickets = allTickets.filter(
-    (t) => t.giftId != null && t.gift?.giftRequesterId === user!.id
-  )
-  const hasActive = activeTickets.length > 0
-  const hasGifted = giftedTickets.length > 0
+
+  /**
+   * Carrusel principal "Mis Entradas":
+   *   · Tickets propios normales          (giftId=null, no isSentGift)
+   *   · Regalos pendientes recibidos      (isIncomingGift=true)
+   *   · Transferencias aceptadas          (giftId=null, giftSenderName!=null)
+   * Excluye los regalos que yo ENVIÉ (isSentGift), que van a su propia sección.
+   */
+  const carouselTickets = allTickets.filter((t) => !t.isSentGift)
+
+  /**
+   * Sección "Regalos en Curso": tickets que YO regalé y aún están pendientes de aceptación.
+   */
+  const giftedTickets = allTickets.filter((t) => t.isSentGift)
+
+  const hasCarousel = carouselTickets.length > 0
+  const hasGifted   = giftedTickets.length > 0
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offset = e.nativeEvent.contentOffset.x
@@ -213,7 +228,7 @@ export default function Page() {
 
   if (ticketsQuery.isLoading) return <Loading />
 
-  if (!hasActive && !hasGifted) return <NoneTickets />
+  if (!hasCarousel && !hasGifted) return <NoneTickets />
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -236,28 +251,28 @@ export default function Page() {
         {/* ── Page header ── */}
         <View style={styles.pageHeader}>
           <Text style={styles.pageTitle}>MIS ENTRADAS</Text>
-          {(hasActive || hasGifted) && (
+          {(hasCarousel || hasGifted) && (
             <View style={styles.totalBadge}>
               <Text style={styles.totalBadgeText}>
-                {activeTickets.length + giftedTickets.length}
+                {carouselTickets.length + giftedTickets.length}
               </Text>
             </View>
           )}
         </View>
 
-        {/* ══════════ SECCIÓN: Mis Entradas ══════════ */}
-        {hasActive && (
+        {/* ══════════ SECCIÓN: Mis Entradas (propios + recibidos como regalo) ══════════ */}
+        {hasCarousel && (
           <View style={styles.section}>
-            <SectionHeader title="Mis Entradas" count={activeTickets.length} />
+            <SectionHeader title="Mis Entradas" count={carouselTickets.length} />
 
-            {/* Contador independiente: Entrada X de X (solo sección disponibles) */}
+            {/* Contador independiente: Entrada X de X */}
             <Text style={styles.entradaCounter}>
-              Entrada {activeIdx + 1} de {activeTickets.length}
+              Entrada {activeIdx + 1} de {carouselTickets.length}
             </Text>
 
-            {/* Carrusel: cada item recibe su propio ticket aislado (sin referencias compartidas) */}
+            {/* Carrusel: tickets propios + regalos pendientes/aceptados */}
             <FlatList
-              data={activeTickets}
+              data={carouselTickets}
               horizontal
               keyExtractor={(item) => {
                 const i = item as TicketItem & { id?: string }
@@ -271,41 +286,55 @@ export default function Page() {
               onScroll={handleScroll}
               scrollEventThrottle={16}
               renderItem={({ item }) => {
-                const raw = item as TicketItem & { giftId?: string | null }
+                const raw = item as TicketItem & {
+                  isSentGift?: boolean
+                  isIncomingGift?: boolean
+                  giftSenderName?: string | null
+                  giftSenderImage?: string | null
+                }
                 const ticket: TicketItem = {
                   id: raw.id ?? raw.userTicketId ?? raw.url,
                   userTicketId: raw.userTicketId ?? raw.url,
                   url: raw.url,
                   quantity: raw.quantity,
                   eventTicket: raw.eventTicket,
-                  giftId: raw.giftId === undefined ? null : raw.giftId,
+                  giftId: raw.giftId ?? null,
+                  isSentGift:      raw.isSentGift      ?? false,
+                  isIncomingGift:  raw.isIncomingGift  ?? false,
+                  giftSenderName:  raw.giftSenderName  ?? null,
+                  giftSenderImage: raw.giftSenderImage ?? null,
                 }
                 return (
                   <TicketItemCard
                     ticket={ticket}
                     cardWidth={CARD_W}
                     styles={styles}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(app)/home/ticket/[eventTicketId]/',
-                        params: {
-                          eventTicketId: item.eventTicket.id,
-                          userTicketId: item.id ?? item.userTicketId,
-                        },
-                      })
-                    }
+                    onPress={() => {
+                      if (ticket.isIncomingGift) {
+                        // Regalo pendiente: lleva a la pantalla de regalos para aceptar
+                        router.push('/(app)/home/gift')
+                      } else {
+                        router.push({
+                          pathname: '/(app)/home/ticket/[eventTicketId]/',
+                          params: {
+                            eventTicketId: item.eventTicket.id,
+                            userTicketId: item.id ?? item.userTicketId,
+                          },
+                        })
+                      }
+                    }}
                   />
                 )
               }}
             />
 
-            <PagerDots total={activeTickets.length} active={activeIdx} />
+            <PagerDots total={carouselTickets.length} active={activeIdx} />
           </View>
         )}
 
         {/* ══════════ SECCIÓN: Regalos en Curso ══════════ */}
         {hasGifted && (
-          <View style={[styles.section, { marginTop: hasActive ? 28 : 0 }]}>
+          <View style={[styles.section, { marginTop: hasCarousel ? 28 : 0 }]}>
             <SectionHeader
               title="Regalos en Curso"
               count={giftedTickets.length}
