@@ -1,0 +1,46 @@
+{
+  "name": "@forevent/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "clean": "rm -rf .turbo node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@forevent/auth": "workspace:^0.1.0",
+    "@forevent/db": "workspace:^0.1.0",
+    "@forevent/ui": "workspace:^0.1.0",
+    "@forevent/validators": "workspace:^0.1.0",
+    "@trpc/server": "11.0.0-next-beta.264",
+    "bcryptjs": "^3.0.3",
+    "dayjs": "^1.11.10",
+    "dayjs-with-plugins": "^1.0.3",
+    "resend": "^3.1.0",
+    "socket.io-client": "^4.7.4",
+    "superjson": "2.2.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@forevent/eslint-config": "workspace:^0.2.0",
+    "@forevent/prettier-config": "workspace:^0.1.0",
+    "@forevent/tsconfig": "workspace:^0.1.0",
+    "@types/bcryptjs": "^3.0.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  },
+  "eslintConfig": {
+    "root": true,
+    "extends": [
+      "@forevent/eslint-config/base"
+    ]
+  },
+  "prettier": "@forevent/prettier-config"
+}

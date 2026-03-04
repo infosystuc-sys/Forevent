@@ -1,0 +1,708 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Session {
+  id             String        @id @default(cuid())
+  createdAt      DateTime      @default(now())
+  expiresAt      DateTime
+  userId         String?
+  internalUserId String?
+  internalUser   InternalUser? @relation(fields: [internalUserId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([internalUserId])
+}
+
+model InternalUser {
+  id               String    @id @default(cuid())
+  createdAt        DateTime  @default(now())
+  name             String
+  email            String    @unique
+  emailVerified    Boolean   @default(false)
+  password         String
+  passwordVerified Boolean   @default(false)
+  image            String?
+  discharged       Boolean   @default(true)
+  sessions         Session[]
+}
+
+model User {
+  id               String          @id @default(cuid())
+  createdAt        DateTime        @default(now())
+  name             String
+  about            String?
+  email            String          @unique
+  emailVerified    Boolean         @default(false)
+  password         String
+  passwordVerified Boolean         @default(false)
+  image            String?
+  locale           String?
+  zoneinfo         String?
+  notifyAll        Boolean         @default(false)
+  notifyEmails     Boolean         @default(false)
+  notifyEvents     Boolean         @default(false)
+  discharged       Boolean         @default(true)
+  globalRole       GlobalRole      @default(USER)
+  lockUntil        DateTime?
+  loginAttempts    Int             @default(0)
+  authChallenges   AuthChallenge[]
+  giftsReceiver    Gift[]          @relation("receiver")
+  giftsRequester   Gift[]          @relation("requester")
+  invites          Invite[]
+  purchases        Purchase[]
+  friendsReceiver  Relationship[]  @relation("receiver")
+  friendsRequester Relationship[]  @relation("requester")
+  sessions         Session[]
+  userOnEvents     UserOnEvent[]
+  userOnGuilds     UserOnGuild[]
+  purchasesBuyer   UserPurchase[]  @relation("buyer")
+  purchasesOwner   UserPurchase[]  @relation("owner")
+  ticketsBuyer     UserTicket[]    @relation("buyer")
+  ticketsOwner     UserTicket[]    @relation("owner")
+}
+
+model AuthChallenge {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  code       String
+  discharged Boolean  @default(true)
+  userId     String?
+  guildId    String?
+  guild      Guild?   @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([guildId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  email     String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
+model Guild {
+  id             String          @id @default(cuid())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  expiresAt      DateTime
+  name           String          @unique
+  address        String
+  country        String
+  email          String          @unique
+  state          String
+  city           String
+  emailVerified  Boolean         @default(false)
+  identifierType String
+  identifier     String
+  taxType        String
+  phone_number   String?
+  image          String?
+  userLimit      Int
+  discharged     Boolean         @default(true)
+  mp_token       String?
+  status         Status          @default(PENDING)
+  commissionRate Float           @default(10.0)
+  challenges     AuthChallenge[]
+  events         Event[]
+  invites        Invite[]
+  usersOnGuild   UserOnGuild[]
+}
+
+model Location {
+  id         String   @id @unique @default(uuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  name       String
+  latitude   Float
+  longitude  Float
+  address    String
+  image      String
+  discharged Boolean  @default(true)
+  iana       String
+  country    String
+  state      String
+  city       String?
+  staticMap  String   @default("")
+  status     Status   @default(PENDING)
+  event      Event?
+}
+
+model Product {
+  id               String             @id @unique @default(uuid())
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  name             String
+  about            String?
+  price            Float
+  type             ProductType
+  discharged       Boolean            @default(true)
+  image            String?
+  eventId          String
+  itemOnPurchase   ItemOnPurchase[]
+  event            Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  productOnDeal    ProductOnDeal[]
+  productOnDeposit ProductOnDeposit[]
+
+  @@index([eventId])
+}
+
+model Transfer {
+  id                 String           @id @default(uuid())
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  fromDepositId      String
+  toDepositId        String
+  productOnDepositId String
+  quantity           Int
+  about              String?
+  transferType       TransferType
+  discharged         Boolean          @default(true)
+  fromDeposit        Deposit          @relation("fromDeposit", fields: [fromDepositId], references: [id], onDelete: Cascade)
+  productOnDeposit   ProductOnDeposit @relation(fields: [productOnDepositId], references: [id], onDelete: Cascade)
+  toDeposit          Deposit          @relation("toDeposit", fields: [toDepositId], references: [id], onDelete: Cascade)
+
+  @@index([fromDepositId])
+  @@index([productOnDepositId])
+  @@index([toDepositId])
+}
+
+model Deposit {
+  id                String             @id @unique @default(uuid())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  name              String
+  about             String?
+  eventId           String
+  counter           Counter[]
+  event             Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  productsOnDeposit ProductOnDeposit[]
+  transfersFrom     Transfer[]         @relation("fromDeposit")
+  transfersto       Transfer[]         @relation("toDeposit")
+
+  @@index([eventId])
+}
+
+model ProductOnDeposit {
+  id         String         @id @unique @default(uuid())
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  productId  String
+  depositId  String
+  quantity   Int
+  discharged Boolean        @default(true)
+  deposit    Deposit        @relation(fields: [depositId], references: [id], onDelete: Cascade)
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  transfer   Transfer[]
+  purchases  UserPurchase[]
+
+  @@index([depositId])
+  @@index([productId])
+}
+
+model Event {
+  id         String            @id @unique @default(uuid())
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  name       String
+  private    Boolean           @default(false)
+  about      String?
+  image      String
+  category   EventCategory?
+  discharged Boolean           @default(true)
+  status     Status            @default(PENDING)
+  endsAt     DateTime
+  startsAt   DateTime
+  locationId String            @unique
+  guildId    String
+  artists    Artist[]
+  chats      Chat[]
+  counters   Counter[]
+  deals      Deal[]
+  deposits   Deposit[]
+  employees  EmployeeOnEvent[]
+  guild      Guild             @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  location   Location          @relation(fields: [locationId], references: [id])
+  tickets    EventTicket[]
+  gates      Gate[]
+  posts      Post[]
+  products   Product[]
+  purchases  Purchase[]
+  reviews    Review[]
+  users      UserOnEvent[]
+
+  @@index([locationId])
+  @@index([guildId])
+}
+
+model Counter {
+  id              String            @id @unique @default(uuid())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  name            String
+  about           String?
+  discharged      Boolean           @default(true)
+  eventId         String
+  depositId       String
+  deposit         Deposit           @relation(fields: [depositId], references: [id], onDelete: Cascade)
+  event           Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  employeeOnEvent EmployeeOnEvent[]
+  userPurchase    UserPurchase[]
+
+  @@index([eventId])
+  @@index([depositId])
+}
+
+model Artist {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  name       String
+  image      String
+  eventId    String
+  discharged Boolean  @default(true)
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Post {
+  id            String      @id @unique @default(uuid())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  discharged    Boolean     @default(true)
+  about         String?
+  eventId       String
+  likes         Int         @default(0)
+  userOnEventId String
+  pictures      Picture[]
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userOnEvent   UserOnEvent @relation(fields: [userOnEventId], references: [id], onDelete: Cascade)
+
+  @@index([userOnEventId])
+  @@index([eventId])
+}
+
+model Picture {
+  id            String      @id @default(uuid())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  url           String
+  postId        String?
+  chatId        String?
+  userOnEventId String
+  chat          Chat?       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  post          Post?       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userOnEvent   UserOnEvent @relation(fields: [userOnEventId], references: [id], onDelete: Cascade)
+
+  @@index([userOnEventId])
+  @@index([postId])
+  @@index([chatId])
+}
+
+model Gift {
+  id               String        @id @default(uuid())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  giftRequesterId  String
+  giftReceiverId   String
+  status           Status        @default(PENDING)
+  userTicketId     String?
+  userPurchaseId   String?
+  discharged       Boolean       @default(true)
+  giftReceiver     User          @relation("receiver", fields: [giftReceiverId], references: [id], onDelete: Cascade)
+  giftRequester    User          @relation("requester", fields: [giftRequesterId], references: [id], onDelete: Cascade)
+  userPurchase     UserPurchase? @relation(fields: [userPurchaseId], references: [id], onDelete: Cascade)
+  userTicket       UserTicket?   @relation(fields: [userTicketId], references: [id], onDelete: Cascade)
+  userTicketAsGift UserTicket[]  @relation("UserTicketGift")
+
+  @@index([giftRequesterId])
+  @@index([giftReceiverId])
+  @@index([userTicketId])
+  @@index([userPurchaseId])
+}
+
+model Relationship {
+  id                String           @id @default(uuid())
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  friendRequesterId String
+  friendReceiverId  String
+  status            Status
+  relationType      RelationshipType
+  discharged        Boolean          @default(true)
+  friendReceiver    User             @relation("receiver", fields: [friendReceiverId], references: [id], onDelete: Cascade)
+  friendRequester   User             @relation("requester", fields: [friendRequesterId], references: [id], onDelete: Cascade)
+
+  @@index([friendRequesterId])
+  @@index([friendReceiverId])
+}
+
+model Chat {
+  id          String      @id @unique @default(uuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  status      Status      @default(ACCEPTED)
+  discharged  Boolean     @default(true)
+  eventId     String
+  requesterId String
+  receiverId  String
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  receiver    UserOnEvent @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  requester   UserOnEvent @relation("requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  pictures    Picture[]
+
+  @@index([requesterId])
+  @@index([receiverId])
+  @@index([eventId])
+}
+
+model Purchase {
+  id                 String           @id @unique @default(uuid())
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  name               String?
+  buyerId            String?
+  total              Float?
+  eventId            String?
+  claimId            String?
+  status             Status           @default(PENDING)
+  mp_merchantOrderId String?
+  mp_paymentId       String?
+  mp_preferenceId    String?          @unique
+  type               PaymentType      @default(ONLINE)
+  items              ItemOnPurchase[]
+  buyer              User?            @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  claim              Claim?           @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  event              Event?           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([buyerId])
+  @@index([eventId])
+  @@index([claimId])
+}
+
+model Deal {
+  id             String           @id @unique @default(uuid())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  discharged     Boolean          @default(true)
+  about          String?
+  name           String
+  image          String
+  price          Float
+  expiresAt      DateTime
+  eventId        String
+  event          Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ItemOnPurchase ItemOnPurchase[]
+  productOnDeal  ProductOnDeal[]
+  UserPurchase   UserPurchase[]
+
+  @@index([eventId])
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  text        String
+  discharged  Boolean     @default(true)
+  requesterId String
+  chatId      String
+  chat        Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  requester   UserOnEvent @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([requesterId])
+}
+
+model Claim {
+  id         String     @id @unique @default(uuid())
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  purchaseId String
+  reason     String
+  status     Status
+  type       ClaimType
+  purchase   Purchase[]
+
+  @@index([purchaseId])
+}
+
+model Invite {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  guildId    String
+  role       Role     @default(EMPLOYEE)
+  discharged Boolean  @default(true)
+  userId     String
+  status     Status   @default(PENDING)
+  guild      Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+  @@index([userId])
+}
+
+model ItemOnPurchase {
+  id            String       @id @default(uuid())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  quantity      Int
+  discharged    Boolean      @default(true)
+  eventTicketId String?
+  productId     String?
+  dealId        String?
+  purchaseId    String
+  deal          Deal?        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  eventTicket   EventTicket? @relation(fields: [eventTicketId], references: [id], onDelete: Cascade)
+  product       Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchase      Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@index([eventTicketId])
+  @@index([productId])
+  @@index([purchaseId])
+  @@index([dealId])
+}
+
+model EventTicket {
+  id             String           @id @unique @default(uuid())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  price          Float
+  name           String
+  about          String?
+  discharged     Boolean          @default(true)
+  eventId        String
+  validUntil     DateTime?
+  quantity       Int
+  event          Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  itemOnPurchase ItemOnPurchase[]
+  userTicket     UserTicket[]
+
+  @@index([eventId])
+}
+
+model UserTicket {
+  id           String       @id @unique @default(uuid())
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  status       Status
+  discharged   Boolean      @default(true)
+  ticketId     String
+  buyerId      String
+  ownerId      String
+  doorkeeperId String?
+  gateId       String?
+  giftId       String?
+  gifts        Gift[]
+  buyer        User         @relation("buyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  doorkeeper   UserOnGuild? @relation(fields: [doorkeeperId], references: [id], onDelete: Cascade)
+  gate         Gate?        @relation(fields: [gateId], references: [id], onDelete: Cascade)
+  owner        User         @relation("owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ticket       EventTicket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  gift         Gift?        @relation("UserTicketGift", fields: [giftId], references: [id], onUpdate: NoAction, map: "fk_userticket_gift")
+
+  @@index([doorkeeperId])
+  @@index([gateId])
+  @@index([ticketId])
+  @@index([buyerId])
+  @@index([ownerId])
+}
+
+model UserPurchase {
+  id                 String            @id @unique @default(uuid())
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  discharged         Boolean           @default(true)
+  productOnDepositId String?
+  buyerId            String
+  ownerId            String
+  status             Status            @default(PENDING)
+  cashierId          String?
+  counterId          String?
+  dealId             String?
+  gifts              Gift[]
+  buyer              User              @relation("buyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  cashier            UserOnGuild?      @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+  counter            Counter?          @relation(fields: [counterId], references: [id], onDelete: Cascade)
+  deal               Deal?             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  owner              User              @relation("owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  productOnDeposit   ProductOnDeposit? @relation(fields: [productOnDepositId], references: [id], onDelete: Cascade)
+
+  @@index([cashierId])
+  @@index([counterId])
+  @@index([productOnDepositId])
+  @@index([buyerId])
+  @@index([ownerId])
+  @@index([dealId])
+}
+
+model EmployeeOnEvent {
+  id            String      @id @default(uuid())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  discharged    Boolean     @default(true)
+  eventId       String
+  userOnGuildId String
+  counterId     String?
+  gateId        String?
+  counter       Counter?    @relation(fields: [counterId], references: [id], onDelete: Cascade)
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  gate          Gate?       @relation(fields: [gateId], references: [id], onDelete: Cascade)
+  userOnGuild   UserOnGuild @relation(fields: [userOnGuildId], references: [id], onDelete: Cascade)
+
+  @@index([userOnGuildId])
+  @@index([counterId])
+  @@index([eventId])
+  @@index([gateId])
+}
+
+model UserOnEvent {
+  id             String    @id @unique @default(uuid())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  discharged     Boolean   @default(true)
+  userId         String
+  eventId        String
+  chatsReceiver  Chat[]    @relation("receiver")
+  chatsRequester Chat[]    @relation("requester")
+  messages       Message[]
+  pictures       Picture[]
+  posts          Post[]
+  event          Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventId])
+}
+
+model UserOnGuild {
+  id              String            @id @unique @default(uuid())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  role            Role
+  discharged      Boolean           @default(true)
+  userId          String
+  guildId         String
+  status          Status            @default(PENDING)
+  employeeOnEvent EmployeeOnEvent[]
+  guild           Guild             @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders          UserPurchase[]
+  UserTicket      UserTicket[]
+
+  @@index([guildId])
+  @@index([userId])
+}
+
+model ProductOnDeal {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  productId  String
+  quantity   Int
+  dealId     String
+  discharged Boolean  @default(true)
+  deal       Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([productId])
+}
+
+model Gate {
+  id              String            @id @unique @default(uuid())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  name            String
+  about           String?
+  eventId         String
+  employeeOnEvent EmployeeOnEvent[]
+  event           Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userTickets     UserTicket[]
+
+  @@index([eventId])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  about     String?
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+enum GlobalRole {
+  SUPERADMIN
+  USER
+}
+
+enum RelationshipType {
+  FRIEND
+  BLOCKED
+}
+
+enum TransferType {
+  TRANSFER
+  DISCHARGE
+  DAMAGED
+}
+
+enum ClaimType {
+  REFUND
+  COMPLAIN
+}
+
+enum PaymentType {
+  ONLINE
+  CASH
+  MERCADOPAGO
+}
+
+enum EventCategory {
+  BAR
+  CULTURAL
+  CLUB
+  SPEED
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  EMPLOYEE
+}
+
+enum Status {
+  ACCEPTED
+  PENDING
+  CANCELLED
+  REJECTED
+  DRAFT
+}
+
+enum ProductType {
+  DRINK
+  FOOD
+  CONSUMABLE
+}

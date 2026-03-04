@@ -1,0 +1,60 @@
+# Resumen de Verificación de Carga de Imágenes
+
+## Variables de Entorno en Vercel
+- **AWS_REGION**: us-east-1
+- **AWS_BUCKET_NAME**: foreventapp
+- **NEXT_PUBLIC_BASE_URL**: https://dashboard.foreventapp.com
+- **NEXT_PUBLIC_API_UPLOAD_URL**: https://dashboard.foreventapp.com
+- **NEXT_PUBLIC_S3_BUCKET**: foreventapp
+
+## Configuración del Bucket S3
+- **Políticas de Acceso**: Permiten la carga de objetos y el acceso público desde los orígenes especificados.
+- **CORS**: Configurado para permitir métodos `GET`, `POST`, `PUT`, y `DELETE` desde los orígenes de la aplicación.
+
+## Código Relevante
+### Endpoint de Carga (`route.ts`)
+- Maneja las solicitudes `OPTIONS` y `POST` para la carga de archivos.
+- Genera un post prefirmado para la carga de archivos en S3.
+
+### Componente de Carga de Imágenes (`CreateProduct`)
+- Utiliza `react-hook-form` para manejar el formulario.
+- Realiza una solicitud `POST` al endpoint de carga para obtener una URL prefirmada.
+- Maneja la carga de archivos y muestra mensajes de éxito o error.
+
+## Problemas Identificados
+- La carga de imágenes falla al intentar crear una organización o producto.
+- La carga manual desde el dashboard de S3 funciona correctamente.
+
+## Siguientes Pasos
+- Verificar la lógica de carga en el cliente.
+- Revisar los logs de Vercel para obtener más información sobre los errores.
+
+Este resumen se utilizará como contexto para continuar la verificación y solución de problemas en la próxima sesión.
+apps/nextjs/src/app/v1/create/page.tsx
+apps/nextjs/src/app/api/guilds/create.ts
+
+Resumen de Verificación de Carga de Imágenes
+Variables de Entorno en Vercel
+AWS_REGION: us-east-1
+AWS_BUCKET_NAME: foreventapp
+NEXT_PUBLIC_BASE_URL: https://www.foreventapp.com
+AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY: Actualizados con las nuevas claves de foreventapp-prod.
+Configuración del Bucket S3
+Políticas de Acceso: Permiten s3:PutObject y s3:GetObject desde los dominios https://www.foreventapp.com y https://dashboard.foreventapp.com.
+CORS: Configurado para permitir métodos GET, POST, PUT, y DELETE desde los orígenes de la aplicación.
+Código Relevante
+Endpoint de Carga (route.ts)
+Genera un post prefirmado para la carga de archivos en S3.
+Verificado que las condiciones de Content-Type y tamaño de archivo son correctas.
+Componente de Carga de Imágenes
+Utiliza react-hook-form para manejar el formulario.
+Realiza una solicitud POST al endpoint de carga para obtener una URL prefirmada.
+Problemas Identificados
+Error 403 solucionado al actualizar las credenciales.
+Error de CORS abordado ajustando configuraciones en el servidor.
+Siguientes Pasos
+Verificar la lógica de carga en el cliente.
+Asegurarse de que el endpoint /api/upload maneje correctamente las solicitudes.
+Este resumen se utilizará como contexto para continuar la verificación y solución de problemas en la próxima sesión.
+
+Si necesitas más ajustes, házmelo saber.

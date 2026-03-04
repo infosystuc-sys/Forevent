@@ -1,0 +1,100 @@
+"use client"
+
+import type { RouterOutputs } from "@forevent/api"
+import type { Session } from '@forevent/auth'
+import { useTheme } from 'next-themes'
+import Link from 'next/link'
+import { api } from "~/trpc/react"
+import { handleSignOut } from '../auth/auth-action'
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { Switch } from '../ui/switch'
+
+function AccountNavBar(
+    { session, invites }: {
+        session: Session | null,
+        invites: Awaited<RouterOutputs["web"]["userOnGuild"]["getInvites"]>
+    }
+) {
+    const { setTheme, theme } = useTheme()
+
+    const getInvites = api.web.userOnGuild.getInvites.useQuery({ email: session?.user.email! as string }, { initialData: invites })
+
+    async function onSignOut() {
+        await handleSignOut()
+    }
+
+    return (
+        <div>
+            <div className="border-b px-10">
+                <div className={`flex flex-1 pt-4 justify-between items-center gap-5`}>
+                    <Link href="/" className={`p-4 ${theme === "light" && "bg-black rounded-lg"}`}>
+                        <div className="h-10 w-10">
+                            <svg preserveAspectRatio="xMidYMid meet" viewBox="0 0 450 600" className=" flex-1 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    fill="#FFF"
+                                    d="M0 523.63V134.27A134.27 134.27 0 01134.27 0h228.65a72.59 72.59 0 010 145.17H188.75a43.57 43.57 0 100 87.13h174.17a72.59 72.59 0 010 145.17H188.75a43.57 43.57 0 00-43.57 43.56v102.6a72.58 72.58 0 11-145.16 0"
+                                />
+                                <path
+                                    d="M362.92 450.86H235.66a17.91 17.91 0 00-17.91 17.91v54.67a72.59 72.59 0 01-72.59 72.59h217.76a72.59 72.59 0 000-145.17"
+                                    fill="#a6539b"
+                                />
+                            </svg>
+                        </div>
+                    </Link>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="relative h-8 w-8 rounded-full border-3 border-red-200">
+                                <Avatar className="h-10 w-10">
+                                    <AvatarImage style={{ objectFit: "cover" }} src={session?.user?.image!} alt="profile-image" />
+                                    <AvatarFallback>{session?.user?.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                                {getInvites.data.length > 0 && <Badge variant={"destructive"} className="absolute top-5 left-5 rounded-full px-2 text-md" >{getInvites.data.length}</Badge>}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-max px-2" align="end" forceMount>
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-2">
+                                    <p className="text-sm font-medium leading-none">{session?.user?.name}</p>
+                                    <p className="text-xs leading-none text-muted-foreground">
+                                        {session?.user?.email}
+                                    </p>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="flex justify-between items-center gap-10">
+                                Modo oscuro
+                                <Switch id="theme" checked={theme === "dark"} onCheckedChange={(checked) => checked ? setTheme("dark") : setTheme("light")} />
+                            </DropdownMenuItem>
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem className="flex items-center gap-2">
+                                    <Link href={"/account/invites"}>
+                                        Invitaciones
+                                    </Link>
+                                    {getInvites.data.length > 0 && <Badge variant={"destructive"} className="" >{getInvites.data.length}</Badge>}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <Link href={"/account/settings"}>
+                                        Ajustes de cuenta
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    Ayuda
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                            {/* <DropdownMenuSeparator /> */}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={onSignOut}>
+                                Cerrar sesión
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default AccountNavBar

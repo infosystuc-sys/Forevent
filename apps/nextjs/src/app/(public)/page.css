@@ -1,0 +1,39 @@
+.home-bg {
+    background-image: url('../../../public/intro.png');
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.scroll-animation {
+  view-timeline-name: --element;
+  view-timeline-axis: block;
+  animation-timeline: --element;
+  animation-name: show;
+  animation-range: entry 5% cover 20%;
+  animation-fill-mode: both;
+}
+
+
+.tendencias:hover {
+    filter: drop-shadow(0px 40px 20px #fde047);
+}
+
+.bar:hover {
+    filter: drop-shadow(0px 40px 20px #6b21a8);
+}
+
+.cultural:hover {
+    filter: drop-shadow(0px 40px 20px #e879f9);
+}
+
+.estasemana:hover {
+    filter: drop-shadow(0px 40px 20px #db2777);
+}
+
+.eventosprivados:hover {
+    filter: drop-shadow(0px 40px 20px #1d4ed8);
+}
+
+.speed:hover {
+    filter: drop-shadow(0px 40px 20px #ff0000);
+}
