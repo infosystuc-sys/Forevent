@@ -5,6 +5,18 @@
     "node": ">=18.18.0"
   },
   "packageManager": "pnpm@8.9.0",
+  "pnpm": {
+    "overrides": {
+      "expo-modules-autolinking": "1.10.3",
+      "expo-font": "11.10.3",
+      "expo-constants": "~15.4.5",
+      "expo-linking": "~6.2.2",
+      "react-native-gesture-handler": "~2.14.0"
+    },
+    "patchedDependencies": {
+      "react-native-gesture-handler@2.14.1": "patches/react-native-gesture-handler@2.14.1.patch"
+    }
+  },
   "scripts": {
     "build": "turbo build",
     "clean": "git clean -xdf node_modules",

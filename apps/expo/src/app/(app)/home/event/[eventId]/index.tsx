@@ -18,16 +18,16 @@
  *   [sticky footer] Comprar Entrada | Comprar Artículo
  */
 
+import Ionicons from '@expo/vector-icons/Ionicons'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { Image, ImageBackground } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
     Dimensions,
     Linking,
-    Platform,
     Pressable,
     ScrollView,
     Share,
@@ -35,6 +35,8 @@ import {
     Text,
     View,
 } from 'react-native'
+import Constants from 'expo-constants'
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Loading from '~/components/loading'
 import { useSession } from '~/context/auth'
@@ -56,6 +58,32 @@ const C = {
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const HERO_H = SCREEN_W * 1.05   // ~45% en Pixel 6
+
+// ─── Map ────────────────────────────────────────────────────────────────────────
+// Fallback a Yerba Buena, Tucumán cuando el evento no tiene coordenadas en DB
+const LAT_FALLBACK = -26.8167
+const LNG_FALLBACK = -65.2833
+
+// Estilo oscuro para Google Maps (desactivado temporalmente para verificar tiles)
+// Re-activar con customMapStyle={DARK_MAP_STYLE} cuando el mapa cargue correctamente
+const DARK_MAP_STYLE = [
+    { elementType: 'geometry',             stylers: [{ color: '#1d2035' }] },
+    { elementType: 'labels.icon',          stylers: [{ visibility: 'off' }] },
+    { elementType: 'labels.text.fill',     stylers: [{ color: '#757575' }] },
+    { elementType: 'labels.text.stroke',   stylers: [{ color: '#212121' }] },
+    { featureType: 'administrative',       elementType: 'geometry',             stylers: [{ color: '#757575' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill',  stylers: [{ color: '#bdbdbd' }] },
+    { featureType: 'poi',                  elementType: 'labels.text.fill',     stylers: [{ color: '#757575' }] },
+    { featureType: 'poi.park',             elementType: 'geometry',             stylers: [{ color: '#181818' }] },
+    { featureType: 'road',                 elementType: 'geometry.fill',        stylers: [{ color: '#2c2c2c' }] },
+    { featureType: 'road',                 elementType: 'labels.text.fill',     stylers: [{ color: '#8a8a8a' }] },
+    { featureType: 'road.arterial',        elementType: 'geometry',             stylers: [{ color: '#373737' }] },
+    { featureType: 'road.highway',         elementType: 'geometry',             stylers: [{ color: '#3c3c3c' }] },
+    { featureType: 'road.highway.controlled_access', elementType: 'geometry',   stylers: [{ color: '#4e4e4e' }] },
+    { featureType: 'transit',              elementType: 'labels.text.fill',     stylers: [{ color: '#757575' }] },
+    { featureType: 'water',                elementType: 'geometry',             stylers: [{ color: '#000000' }] },
+    { featureType: 'water',                elementType: 'labels.text.fill',     stylers: [{ color: '#3d3d3d' }] },
+]
 
 // ─── Price formatter ────────────────────────────────────────────────────────────
 function fmt(price: number) {
@@ -84,9 +112,38 @@ export default function EventDetailPage() {
 
     const { data: event, isLoading } = api.mobile.event.byId.useQuery({ id: eventId! })
 
+    // ─── TODOS LOS HOOKS ANTES DE CUALQUIER return (Rules of Hooks) ───
+    // Coordenadas: derivar con optional chaining para que existan siempre (incluso cuando event es undefined)
+    const rawLat = event?.location?.latitude ?? 0
+    const rawLng = event?.location?.longitude ?? 0
+    const mapLat = (rawLat === 0 && rawLng === 0) ? LAT_FALLBACK : rawLat
+    const mapLng = (rawLat === 0 && rawLng === 0) ? LNG_FALLBACK : rawLng
+
+    // Log coordenadas móvil vs web admin (apiKeyVacia) — siempre se ejecuta, no condicional
+    useEffect(() => {
+        console.log('DEBUG KEY:', process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? 'PRESENTE' : 'AUSENTE')
+        const keyFromEnv = typeof process !== 'undefined' && !!process.env?.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+        const keyFromExtra = Constants.expoConfig?.extra?.googleMapsApiKeyConfigured === true
+        const apiKeyVacia = !keyFromEnv && !keyFromExtra
+        console.log('[EventDetail] Coordenadas móvil:', {
+            raw: { latitude: rawLat, longitude: rawLng },
+            map: { mapLat, mapLng },
+            address: event?.location?.address,
+            apiKeyVacia,
+        })
+    }, [rawLat, rawLng, mapLat, mapLng, event?.location?.address])
+
+    // Init selección de ticket al cargar evento (evita setState durante render)
+    useEffect(() => {
+        if (event?.tickets?.[0] && !selectedTicketId) {
+            setSelectedTicketId(event.tickets[0].id)
+        }
+    }, [event?.tickets, selectedTicketId])
+
+    // Early return DESPUÉS de todos los Hooks
     if (isLoading || !event) return <Loading />
 
-    // Derive values
+    // Derive values (solo cuando event existe)
     const minPrice  = event.tickets?.reduce((m, t) => t.price < m ? t.price : m, Infinity) ?? 0
     const safePrice = minPrice === Infinity ? 0 : minPrice
     const selectedTicket = event.tickets?.find(t => t.id === selectedTicketId) ?? event.tickets?.[0]
@@ -97,15 +154,9 @@ export default function EventDetailPage() {
     const timeLabel  = `${startDate.format('HH:mm')}${endDate ? ` – ${endDate.format('HH:mm')}` : ''}`
     const isLive     = dayjs().isAfter(startDate) && (!endDate || dayjs().isBefore(endDate))
 
-    const onOpenMaps = () => {
-        const scheme = Platform.select({ ios: 'maps://0,0?q=', android: 'geo:0,0?q=' })
-        const latLng = `${event.location?.latitude},${event.location?.longitude}`
-        const label  = event.location?.name ?? ''
-        const url    = Platform.select({
-            ios:     `${scheme}${label}@${latLng}`,
-            android: `${scheme}${latLng}(${label})`,
-        })
-        Linking.openURL(url ?? `maps://0,0?q=${label}@${latLng}`)
+    const onOpenGoogleMaps = () => {
+        const url = `https://www.google.com/maps/search/?api=1&query=${mapLat},${mapLng}`
+        Linking.openURL(url)
     }
 
     const onShare = () => {
@@ -119,10 +170,8 @@ export default function EventDetailPage() {
         })
     }
 
-    // Init selection to first ticket if not set yet
-    if (!selectedTicketId && event.tickets?.[0]) {
-        setSelectedTicketId(event.tickets[0].id)
-    }
+    // Coordenadas válidas para MapView: números finitos (mapLat/mapLng ya tienen fallback)
+    const hasValidCoords = Number.isFinite(mapLat) && Number.isFinite(mapLng)
 
     return (
         <View style={styles.root}>
@@ -261,45 +310,82 @@ export default function EventDetailPage() {
                         </View>
                     )}
 
-                    {/* ── Ubicación ── */}
-                    {event.location && (
+                    {/* ── Ubicación ── (MapView solo si coordenadas válidas) */}
+                    {event.location && hasValidCoords && (
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Ubicación</Text>
-                            <Pressable style={styles.mapCard} onPress={onOpenMaps}>
-                                {event.location.staticMap ? (
-                                    <Image
-                                        source={{ uri: event.location.staticMap }}
-                                        placeholder={blurhash}
-                                        cachePolicy="memory-disk"
-                                        style={styles.mapImage}
-                                        contentFit="cover"
+                            <View style={styles.mapCard}>
+                                {/* MapView: provider Google forzado, sin customMapStyle para verificar tiles */}
+                                <MapView
+                                    style={styles.mapViewFill}
+                                    provider={PROVIDER_GOOGLE}
+                                    initialRegion={{
+                                        latitude:       mapLat,
+                                        longitude:      mapLng,
+                                        latitudeDelta:  0.01,
+                                        longitudeDelta: 0.01,
+                                    }}
+                                    scrollEnabled={false}
+                                    zoomEnabled={false}
+                                    rotateEnabled={false}
+                                    pitchEnabled={false}
+                                    pointerEvents="none"
+                                    liteMode={false}
+                                >
+                                    <Marker
+                                        coordinate={{ latitude: mapLat, longitude: mapLng }}
+                                        pinColor={C.magenta}
                                     />
-                                ) : (
-                                    <View style={[styles.mapImage, styles.mapPlaceholder]}>
-                                        <MaterialCommunityIcons name="map" size={40} color={C.dim} />
-                                    </View>
-                                )}
+                                </MapView>
 
-                                {/* Location overlay */}
+                                {/* Gradient suave (solo borde inferior, sin tapar el mapa) */}
                                 <LinearGradient
-                                    colors={['transparent', 'rgba(0,0,0,0.75)']}
-                                    style={styles.mapGradient}
-                                    start={{ x: 0, y: 0.4 }}
+                                    colors={['transparent', 'rgba(0,0,0,0.25)']}
+                                    style={[styles.mapGradient, { zIndex: 1 }]}
+                                    start={{ x: 0, y: 0.75 }}
                                     end={{ x: 0, y: 1 }}
                                     pointerEvents="none"
                                 />
-                                <View style={styles.mapOverlay}>
+
+                                {/* Info + FAB de navegación */}
+                                <View style={[styles.mapOverlay, { zIndex: 2 }]}>
                                     <View style={styles.mapOverlayText}>
                                         <Text style={styles.mapName}>{event.location.name}</Text>
                                         <Text style={styles.mapAddress} numberOfLines={1}>
-                                            {event.location.address}, {event.location.city}
+                                            {event.location.address}
+                                            {event.location.city ? `, ${event.location.city}` : ''}
                                         </Text>
                                     </View>
-                                    <View style={styles.mapFab}>
+                                    <Pressable style={styles.mapFab} onPress={onOpenGoogleMaps}>
                                         <MaterialCommunityIcons name="navigation" size={18} color="#fff" />
+                                    </Pressable>
+                                </View>
+                            </View>
+
+                            {/* ── Datos de ubicación debajo del mapa ── */}
+                            <View style={styles.locationInfoCard}>
+                                <View style={styles.locationInfoRow}>
+                                    <Ionicons name="location" size={18} color={C.magenta} style={styles.locationIcon} />
+                                    <View style={styles.locationInfoText}>
+                                        <Text style={styles.locationVenueName} numberOfLines={2}>
+                                            {event?.location?.name ?? 'Ubicación del evento'}
+                                        </Text>
+                                        <Text style={styles.locationAddress} numberOfLines={2}>
+                                            {[event?.location?.address, event?.location?.city].filter(Boolean).join(', ') || 'Dirección no disponible'}
+                                        </Text>
                                     </View>
                                 </View>
-                            </Pressable>
+                                <View style={styles.locationInfoRow}>
+                                    <Ionicons name="time-outline" size={18} color={C.dim} style={styles.locationIcon} />
+                                    <Text style={styles.locationTime}>
+                                        {dateLabel} · {timeLabel}
+                                    </Text>
+                                </View>
+                                <Pressable style={styles.openMapsBtn} onPress={onOpenGoogleMaps}>
+                                    <Ionicons name="navigate" size={18} color="#fff" />
+                                    <Text style={styles.openMapsBtnText}>Abrir en Google Maps</Text>
+                                </Pressable>
+                            </View>
                         </View>
                     )}
 
@@ -561,20 +647,18 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // ── Map
+    // ── Map (dimensiones explícitas para Android)
     mapCard: {
         borderRadius: 16,
         overflow: 'hidden',
-        height: 160,
+        height: 250,
+        minHeight: 250,
+        flex: 1,
+        backgroundColor: '#1d2035',
     },
-    mapImage: {
-        width: '100%',
-        height: '100%',
-    },
-    mapPlaceholder: {
-        backgroundColor: C.surface,
-        alignItems: 'center',
-        justifyContent: 'center',
+    mapViewFill: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 0,
     },
     mapGradient: {
         ...StyleSheet.absoluteFillObject,
@@ -592,6 +676,7 @@ const styles = StyleSheet.create({
     mapOverlayText: {
         flex: 1,
         gap: 2,
+        marginRight: 10,
     },
     mapName: {
         color: C.white,
@@ -603,16 +688,70 @@ const styles = StyleSheet.create({
         fontSize: 11,
     },
     mapFab: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: C.magenta,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: C.magenta,
-        shadowOpacity: 0.6,
-        shadowRadius: 8,
-        elevation: 6,
+        shadowOpacity: 0.65,
+        shadowRadius: 10,
+        elevation: 8,
+    },
+
+    // ── Ubicación: datos debajo del mapa
+    locationInfoCard: {
+        marginTop: 12,
+        backgroundColor: C.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: C.border,
+        padding: 16,
+        gap: 12,
+    },
+    locationInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    locationIcon: {
+        marginTop: 2,
+    },
+    locationInfoText: {
+        flex: 1,
+        gap: 4,
+    },
+    locationVenueName: {
+        color: C.white,
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    locationAddress: {
+        color: C.dim,
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    locationTime: {
+        flex: 1,
+        color: C.dim,
+        fontSize: 13,
+    },
+    openMapsBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: C.magenta,
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        marginTop: 4,
+    },
+    openMapsBtnText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
     },
 
     // ── Ticket cards

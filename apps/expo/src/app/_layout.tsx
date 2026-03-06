@@ -8,10 +8,29 @@ import { TRPCProvider } from "~/utils/api";
 import "../styles.css";
 
 import { useColorScheme } from "nativewind";
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
 import { View, useWindowDimensions } from "react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+
+class GestureRootErrorBoundary extends React.Component<
+  { children: ReactNode },
+  { useFallback: boolean }
+> {
+  state = { useFallback: false };
+  static getDerivedStateFromError = () => ({ useFallback: true });
+  render() {
+    if (this.state.useFallback) {
+      return <View style={{ flex: 1 }}>{this.props.children}</View>;
+    }
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        {this.props.children}
+      </GestureHandlerRootView>
+    );
+  }
+}
 import { StyleSheet } from "react-native";
 import { SplashScreen } from "expo-router";
 import { Animated } from "react-native";
@@ -159,7 +178,7 @@ export default function RootLayout() {
 
   return (
     <TRPCProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureRootErrorBoundary>
         <SessionProvider>
           <ThemeProvider value={DarkTheme}>
             <AnimatedSplashScreen fontsLoaded={fontsLoaded}>
@@ -170,7 +189,7 @@ export default function RootLayout() {
           </ThemeProvider>
         </SessionProvider>
         <StatusBar />
-      </GestureHandlerRootView>
+      </GestureRootErrorBoundary>
     </TRPCProvider>
   );
 }

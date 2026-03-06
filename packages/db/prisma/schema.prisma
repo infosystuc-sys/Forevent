@@ -129,8 +129,8 @@ model Location {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   name       String
-  latitude   Float
-  longitude  Float
+  latitude   Float?
+  longitude  Float?
   address    String
   image      String
   discharged Boolean  @default(true)

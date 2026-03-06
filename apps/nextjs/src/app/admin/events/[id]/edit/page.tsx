@@ -31,6 +31,11 @@ export default async function AdminEventEditPage({
           select: {
             address: true,
             name: true,
+            latitude: true,
+            longitude: true,
+            city: true,
+            state: true,
+            country: true,
           },
         },
         tickets: {
@@ -73,9 +78,15 @@ export default async function AdminEventEditPage({
           organizationId: event.guildId,
           description: event.about ?? "",
           startsAt: toDatetimeLocal(event.startsAt),
-          location: event.location?.address ?? event.location?.name ?? "",
+          location: event.location?.name ?? event.location?.address ?? "",
           imageUrl: event.image,
           capacity,
+          latitude: event.location?.latitude ?? null,
+          longitude: event.location?.longitude ?? null,
+          locationAddress: event.location?.address ?? "",
+          locationCity: event.location?.city ?? "",
+          locationState: event.location?.state ?? "",
+          locationCountry: event.location?.country ?? "Argentina",
         }}
       />
     </div>

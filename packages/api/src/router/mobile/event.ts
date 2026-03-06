@@ -36,163 +36,82 @@ export const eventRouter = createTRPCRouter({
   })).query(async ({ ctx, input }) => {
     const { latitude, longitude } = input
 
-    let longitudeConditional: any = {}
-    if (longitude > -179.8 && longitude > 179.8) {
-      longitudeConditional['longitude'] = {
-        lte: longitude + 0.2,
-        gte: longitude - 0.2
-      }
-    } else if (longitude >= 179.8) {
-      longitudeConditional['OR'] = [{
-        longitude: {
-          lte: 180,
-          gte: longitude - 0.2
-        }
-      },
-      {
-        longitude: {
-          lte: ((longitude + 0.2) - 180) * -1,
-          gte: -180,
-        }
-      }]
-    } else if (longitude <= -179.8) {
-      let a: any = {
-        longitude: {
-          lte: 180,
-          gte: ((longitude - 0.2) + 180) * -1,
-        }
-      }
-      if (longitude === -179.8) {
-        a = { longitude: 180 }
-      }
-      longitudeConditional['OR'] = [{
-        longitude: {
-          lte: longitude + 0.2,
-          gte: -180
-        }
-      }, a]
-    }
-    const data = await ctx.prisma.event.findMany({
-      take: 3,
-      orderBy: { createdAt: 'desc' },
-      where: {
-        discharged: true,
-        private: false,
-        status: "ACCEPTED",
-        location: {
-          AND: [
-            longitudeConditional,
-            {
-              latitude: {
-                lte: latitude + 0.2,
-                gte: latitude - 0.2
-              }
-            }
-          ]
-        },
-      },
-      select: {
-        id: true,
-        image: true,
-        createdAt: true,
-        startsAt: true,
-        endsAt: true,
-        about: true,
-        name: true,
-        location: {
-          select: {
-            address: true,
-            image: true,
-            city: true,
-            country: true,
-            iana: true,
-            latitude: true,
-            longitude: true,
-            id: true,
-            name: true,
-            createdAt: true,
-            staticMap: true,
-          }
-        },
-        artists: {
-          select: {
-            image: true,
-            name: true,
-            id: true
-          }
-        },
-        tickets: {
-          orderBy: { price: 'asc' },
-          where: { discharged: true },
-          select: {
-            id: true,
-            about: true,
-            createdAt: true,
-            name: true,
-            price: true,
-            quantity: true,
-            validUntil: true,
-          }
-        },
-      }
-    })
-    // console.log(data, 'data')
-    const ifNone = await ctx.prisma.event.findMany({
-      take: 3,
-      orderBy: { createdAt: 'desc' },
-      where: {
-        discharged: true,
-        private: false,
-        status: "ACCEPTED",
-      },
-      select: {
-        id: true,
-        image: true,
-        createdAt: true,
-        startsAt: true,
-        endsAt: true,
-        about: true,
-        name: true,
-        location: {
-          select: {
-            address: true,
-            image: true,
-            city: true,
-            country: true,
-            iana: true,
-            latitude: true,
-            longitude: true,
-            id: true,
-            name: true,
-            createdAt: true,
-            staticMap: true,
-          }
-        },
-        artists: {
-          select: {
-            image: true,
-            name: true,
-            id: true
-          }
-        },
-        tickets: {
-          orderBy: { price: 'desc' },
-          where: { discharged: true },
-          select: {
-            id: true,
-            about: true,
-            createdAt: true,
-            name: true,
-            price: true,
-            quantity: true,
-            validUntil: true,
-          }
-        },
-      }
-    })
-    // console.log(data, "datazo mi rey", ifNone)
+    // Coordenadas (0, 0) significan "sin preferencia de ubicación" —
+    // se envían desde el frontend cuando el usuario no otorgó permiso de ubicación.
+    // En ese caso (y como fallback), se devuelven los próximos eventos aceptados.
+    const hasRealLocation = Math.abs(latitude) > 0.5 || Math.abs(longitude) > 0.5
 
-    return data.length === 0 ? ifNone : data
+    const eventSelect = {
+      id: true,
+      image: true,
+      createdAt: true,
+      startsAt: true,
+      endsAt: true,
+      about: true,
+      name: true,
+      location: {
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          city: true,
+          country: true,
+          iana: true,
+          image: true,
+          latitude: true,
+          longitude: true,
+          staticMap: true,
+          createdAt: true,
+        }
+      },
+      artists: {
+        select: { id: true, name: true, image: true }
+      },
+      tickets: {
+        orderBy: { price: 'asc' as const },
+        where: { discharged: true },
+        select: {
+          id: true,
+          name: true,
+          about: true,
+          price: true,
+          quantity: true,
+          validUntil: true,
+          createdAt: true,
+        }
+      },
+    }
+
+    const baseWhere = {
+      discharged: true,
+      private: false,
+      status: "ACCEPTED" as const,
+    }
+
+    // Con coordenadas reales: intentar mostrar eventos cercanos primero
+    if (hasRealLocation) {
+      const nearby = await ctx.prisma.event.findMany({
+        take: 6,
+        orderBy: { startsAt: 'asc' },
+        where: {
+          ...baseWhere,
+          location: {
+            latitude:  { lte: latitude  + 0.5, gte: latitude  - 0.5 },
+            longitude: { lte: longitude + 0.5, gte: longitude - 0.5 },
+          },
+        },
+        select: eventSelect,
+      })
+      if (nearby.length > 0) return nearby
+    }
+
+    // Fallback: próximos eventos aceptados sin restricción geográfica
+    return ctx.prisma.event.findMany({
+      take: 6,
+      orderBy: { startsAt: 'asc' },
+      where: baseWhere,
+      select: eventSelect,
+    })
   }),
 
   trending: publicProcedure.input(z.object({

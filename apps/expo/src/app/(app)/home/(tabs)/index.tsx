@@ -64,7 +64,14 @@ export default function Page() {
     const [search, setSearch]     = useState('')
     const [activeTab, setActiveTab] = useState('ALL')
 
-    const events = api.mobile.event.highlighted.useQuery({ latitude: 0, longitude: 0 })
+    const events = api.mobile.event.highlighted.useQuery(
+        { latitude: 0, longitude: 0 },
+        {
+            staleTime: 0,
+            refetchOnMount: 'always',
+            refetchOnWindowFocus: true,
+        }
+    )
 
     const isLoading  = events.isLoading
     const isRefresh  = events.isFetching && !events.isLoading

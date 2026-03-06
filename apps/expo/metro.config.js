@@ -6,6 +6,11 @@ const path = require("path");
 // 1. Importamos la utilidad para crear listas negras
 const exclusionList = require("metro-config/src/defaults/exclusionList");
 
+// Cargar .env desde la raíz del monorepo (para EXPO_PUBLIC_GOOGLE_MAPS_API_KEY)
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, "../..");
+require("@expo/env").load(workspaceRoot, { force: true });
+
 module.exports = withTurborepoManagedCache(
   withMonorepoPaths(
     withNativeWind(getDefaultConfig(__dirname), {

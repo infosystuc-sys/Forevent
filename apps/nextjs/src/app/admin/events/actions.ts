@@ -7,13 +7,27 @@ import { z } from "zod";
 import db from "@forevent/db";
 import { uploadImageToS3 } from "~/lib/s3";
 
+// Convierte un valor de FormData a número decimal o null si está vacío/inválido.
+// Evita que z.coerce.number() trate el string vacío "" como 0.
+const coerceCoordinate = z.preprocess((v) => {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}, z.number().nullable());
+
 const createEventSchema = z.object({
   name: z.string().min(2, "El nombre es requerido."),
   organizationId: z.string().min(1, "La organización es requerida."),
   description: z.string().min(2, "La descripción es requerida."),
   startsAt: z.string().min(1, "La fecha de inicio es requerida."),
   location: z.string().min(2, "La ubicación es requerida."),
+  address: z.string().optional(),
   capacity: z.coerce.number().int().min(1, "La capacidad debe ser mayor a 0."),
+  latitude: coerceCoordinate,
+  longitude: coerceCoordinate,
+  locationCity: z.string().optional(),
+  locationState: z.string().optional(),
+  locationCountry: z.string().optional(),
 });
 
 export async function createEventAction(
@@ -26,7 +40,13 @@ export async function createEventAction(
     description: formData.get("description")?.toString() ?? "",
     startsAt: formData.get("startsAt")?.toString() ?? "",
     location: formData.get("location")?.toString() ?? "",
+    address: formData.get("address")?.toString() ?? "",
     capacity: formData.get("capacity")?.toString() ?? "",
+    latitude: formData.get("latitude")?.toString() ?? "",
+    longitude: formData.get("longitude")?.toString() ?? "",
+    locationCity: formData.get("locationCity")?.toString() ?? "",
+    locationState: formData.get("locationState")?.toString() ?? "",
+    locationCountry: formData.get("locationCountry")?.toString() ?? "",
   });
 
   if (!parsed.success) {
@@ -35,7 +55,7 @@ export async function createEventAction(
     };
   }
 
-  const { name, organizationId, description, startsAt, location, capacity } =
+  const { name, organizationId, description, startsAt, location, address, capacity, latitude, longitude, locationCity, locationState, locationCountry } =
     parsed.data;
 
   const coverImage = formData.get("coverImage");
@@ -64,16 +84,25 @@ export async function createEventAction(
 
   const endsAtDate = new Date(startsAtDate.getTime() + 4 * 60 * 60 * 1000);
 
+  const locAddress = address?.trim() || location;
+  const locState = locationState?.trim() || "Tucumán";
+  const locCountry = locationCountry?.trim() || "Argentina";
+  const latNum =
+    latitude != null ? Number(latitude) : null;
+  const lngNum =
+    longitude != null ? Number(longitude) : null;
   const createdLocation = await db.location.create({
     data: {
       name: location,
-      address: location,
-      latitude: 0,
-      longitude: 0,
+      address: locAddress,
+      latitude:
+        latNum != null && !Number.isNaN(latNum) ? latNum : null,
+      longitude:
+        lngNum != null && !Number.isNaN(lngNum) ? lngNum : null,
       iana: "America/Argentina/Buenos_Aires",
-      country: "Argentina",
-      state: "Buenos Aires",
-      city: "Buenos Aires",
+      country: locCountry,
+      state: locState,
+      city: locationCity?.trim() || null,
       image: imageUrl,
     },
   });
@@ -109,8 +138,14 @@ const updateEventSchema = z.object({
   description: z.string().min(2, "La descripción es requerida."),
   startsAt: z.string().min(1, "La fecha de inicio es requerida."),
   location: z.string().min(2, "La ubicación es requerida."),
+  address: z.string().optional(),
   capacity: z.coerce.number().int().min(1, "La capacidad debe ser mayor a 0."),
   existingImageUrl: z.string().min(1, "La imagen actual es requerida."),
+  latitude: coerceCoordinate,
+  longitude: coerceCoordinate,
+  locationCity: z.string().optional(),
+  locationState: z.string().optional(),
+  locationCountry: z.string().optional(),
 });
 
 export async function updateEventAction(
@@ -124,8 +159,14 @@ export async function updateEventAction(
     description: formData.get("description")?.toString() ?? "",
     startsAt: formData.get("startsAt")?.toString() ?? "",
     location: formData.get("location")?.toString() ?? "",
+    address: formData.get("address")?.toString() ?? "",
     capacity: formData.get("capacity")?.toString() ?? "",
     existingImageUrl: formData.get("existingImageUrl")?.toString() ?? "",
+    latitude: formData.get("latitude")?.toString() ?? "",
+    longitude: formData.get("longitude")?.toString() ?? "",
+    locationCity: formData.get("locationCity")?.toString() ?? "",
+    locationState: formData.get("locationState")?.toString() ?? "",
+    locationCountry: formData.get("locationCountry")?.toString() ?? "",
   });
 
   if (!parsed.success) {
@@ -141,8 +182,14 @@ export async function updateEventAction(
     description,
     startsAt,
     location,
+    address,
     capacity,
     existingImageUrl,
+    latitude,
+    longitude,
+    locationCity,
+    locationState,
+    locationCountry,
   } = parsed.data;
 
   const startsAtDate = new Date(startsAt);
@@ -183,14 +230,45 @@ export async function updateEventAction(
     return { error: "Evento no encontrado." };
   }
 
+  const locAddress = address?.trim() || location;
+  const locUpdateData: {
+    name: string;
+    address: string;
+    image: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    latitude?: number;
+    longitude?: number;
+  } = {
+    name: location,
+    address: locAddress,
+    image: imageUrl,
+  };
+  if (locationCity?.trim()) locUpdateData.city = locationCity.trim();
+  if (locationState?.trim()) locUpdateData.state = locationState.trim();
+  if (locationCountry?.trim()) locUpdateData.country = locationCountry.trim();
+  // Lat/lng como Number explícito para Prisma (float8 en Supabase)
+  if (latitude != null) {
+    const latNum = Number(latitude);
+    if (!Number.isNaN(latNum)) locUpdateData.latitude = latNum;
+  }
+  if (longitude != null) {
+    const lngNum = Number(longitude);
+    if (!Number.isNaN(lngNum)) locUpdateData.longitude = lngNum;
+  }
+  // Debug: verificar coordenadas antes de Prisma
+  console.log("[updateEventAction] Coordenadas recibidas:", {
+    formDataLat: formData.get("latitude"),
+    formDataLng: formData.get("longitude"),
+    parsed: { latitude, longitude },
+    locUpdateData: { lat: locUpdateData.latitude, lng: locUpdateData.longitude },
+  });
+
   await db.$transaction(async (tx) => {
     await tx.location.update({
       where: { id: existingEvent.locationId },
-      data: {
-        name: location,
-        address: location,
-        image: imageUrl,
-      },
+      data: locUpdateData,
     });
 
     await tx.event.update({
