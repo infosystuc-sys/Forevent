@@ -19,13 +19,7 @@ const defineConfig = (config) => {
     }`,
         );
       }
-      if (!config.modResults.contents.includes("implementation project(':react-native-background-timer')")) {
-          config.modResults.contents = config.modResults.contents.replace(
-              "dependencies {",
-              `dependencies {
-        implementation project(':react-native-background-timer')`,
-          );
-      }
+      
       if (!config.modResults.contents.includes("reactNativeVersion =")) {
         config.modResults.contents = config.modResults.contents.replace(
           "ext {",

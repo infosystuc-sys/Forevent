@@ -20,7 +20,6 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        implementation project(':react-native-background-timer')
         classpath('com.android.tools.build:gradle')
         classpath('com.facebook.react:react-native-gradle-plugin')
     }
