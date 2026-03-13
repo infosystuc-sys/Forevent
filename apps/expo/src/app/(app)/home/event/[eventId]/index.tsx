@@ -125,6 +125,7 @@ export default function EventDetailPage() {
         const keyFromEnv = typeof process !== 'undefined' && !!process.env?.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         const keyFromExtra = Constants.expoConfig?.extra?.googleMapsApiKeyConfigured === true
         const apiKeyVacia = !keyFromEnv && !keyFromExtra
+        console.log('Coordenadas en Mapa:', event?.location)
         console.log('[EventDetail] Coordenadas móvil:', {
             raw: { latitude: rawLat, longitude: rawLng },
             map: { mapLat, mapLng },
@@ -647,13 +648,12 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // ── Map (dimensiones explícitas para Android)
+    // ── Map (dimensiones explícitas para Android; sin height el mapa puede renderizar a 0)
     mapCard: {
         borderRadius: 16,
         overflow: 'hidden',
-        height: 250,
-        minHeight: 250,
-        flex: 1,
+        height: 300,
+        minHeight: 300,
         backgroundColor: '#1d2035',
     },
     mapViewFill: {

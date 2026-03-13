@@ -286,55 +286,36 @@ export function CreateGuildForm({ session }: { session: Session | null }) {
                                                             <Input
                                                                 id="image"
                                                                 type="file"
-                                                                accept=".jpg, .jpeg"
+                                                                accept=".jpg,.jpeg,.png"
+                                                                disabled={loading}
                                                                 onChange={async (e) => {
+                                                                    const file = e.target.files?.[0]
+                                                                    if (!file) return
                                                                     setLoading(true)
-                                                                    console.log(e.target.files, "EVENT")
-                                                                    if (e.target.files?.[0]) {
-                                                                        const file = e.target.files[0]
-
-                                                                        const response = await fetch(
-                                                                            process.env.NEXT_PUBLIC_BASE_URL + '/api/upload',
-                                                                            {
-                                                                                method: 'POST',
-                                                                                headers: {
-                                                                                    'Content-Type': 'application/json',
-                                                                                },
-                                                                                body: JSON.stringify({ filename: file.name, contentType: file.type }),
-                                                                            }
-                                                                        )
-
-                                                                        if (response.ok) {
-                                                                            const { url, fields } = await response.json()
-
-                                                                            console.log(url, "url", fields, "fields")
-
-                                                                            const formData = new FormData()
-                                                                            Object.entries(fields).forEach(([key, value]) => {
-                                                                                formData.append(key, value as string)
-                                                                            })
-                                                                            formData.append('file', file)
-
-                                                                            const uploadResponse = await fetch(url, {
-                                                                                method: 'POST',
-                                                                                body: formData,
-                                                                            })
-
-                                                                            if (uploadResponse.ok) {
-                                                                                form.setValue("image", "https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key)
-                                                                                console.log("https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key, "   URL DEL ARCHIVO")
-                                                                                // alert('Upload successful!')
-                                                                            } else {
-                                                                                console.error('S3 Upload Error:', await uploadResponse.text())
-                                                                                // alert('Upload failed.')
-                                                                            }
+                                                                    try {
+                                                                        const formData = new FormData()
+                                                                        formData.append('file', file)
+                                                                        formData.append('prefix', 'guilds')
+                                                                        const response = await fetch('/api/upload', {
+                                                                            method: 'POST',
+                                                                            body: formData,
+                                                                        })
+                                                                        const result = (await response.json()) as { url?: string; error?: string }
+                                                                        if (response.ok && result.url) {
+                                                                            form.setValue("image", result.url)
+                                                                            toast.success("Imagen subida correctamente")
                                                                         } else {
-                                                                            console.error('Failed to get pre-signed URL:', await response.text())
+                                                                            console.error("[guild/upload] Error:", result.error)
+                                                                            toast.error(result.error ?? "Error al subir la imagen.")
                                                                         }
+                                                                    } catch (err) {
+                                                                        const msg = err instanceof Error ? err.message : "Error de red"
+                                                                        console.error("[guild/upload] Error:", err)
+                                                                        toast.error(msg)
+                                                                    } finally {
+                                                                        setLoading(false)
                                                                     }
-                                                                    setLoading(false)
-                                                                }
-                                                                }
+                                                                }}
                                                             />
                                                     }
                                                 </div>

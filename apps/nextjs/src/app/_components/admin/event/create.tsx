@@ -426,24 +426,23 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
     })
 
     const createEvent = api.web.event.create.useMutation({
-        onSuccess: async () => {
-            console.log("SUCCESS")
-            toast("Exito", {
-                description: "Evento creado con exito",
-                action: {
-                    label: "Cerrar", onClick: () => {
-
-                    }
-                }
-            })
-            route.back()
+        onSuccess: async (event) => {
+            console.log("[createEvent] Datos enviados correctamente, evento creado:", event?.id)
+            toast.success("Evento creado con éxito")
             await utils.web.event.byGuildId.invalidate()
+            if (event?.id) {
+                route.push(`/v1/${guildId}/events/${event.id}`)
+            } else {
+                route.push(`/v1/${guildId}/events`)
+            }
         },
         onError: (error) => {
-            console.error("Event creation error:", error)
+            console.error("[createEvent] Error del servidor:", error)
+            toast.error(error.message ?? "Error al crear el evento")
         }
     })
 
+    const [productImageUploading, setProductImageUploading] = useState(false)
     const [rowSelection, setRowSelection] = useState({})
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -500,8 +499,27 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
     })
 
     const onSubmitCompleteEvent = async (values: z.infer<typeof completeEventSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
+        console.log("[createEvent] Datos enviados:", values)
         createEvent.mutate({ ...values, guildId })
+    }
+
+    const onValidationError = (errors: Record<string, unknown>) => {
+        console.error("[createEvent] Errores de validación:", errors)
+        const flatten = (obj: unknown, path = ""): string[] => {
+            if (!obj || typeof obj !== "object") return []
+            const entries = Object.entries(obj as Record<string, unknown>)
+            return entries.flatMap(([k, v]) =>
+                v && typeof v === "object" && "message" in v && typeof (v as { message?: string }).message === "string"
+                    ? [(v as { message: string }).message]
+                    : flatten(v, `${path}.${k}`)
+            )
+        }
+        const messages = flatten(errors)
+        const hasLocationError = "location" in errors
+        const msg = hasLocationError
+            ? "Por favor, selecciona una ubicación válida en el mapa para obtener las coordenadas."
+            : (messages[0] ?? "Revisa los campos del formulario")
+        toast.error(msg)
     }
 
     const searchForm = useForm<z.infer<typeof searchSchema>>({
@@ -678,9 +696,10 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
         }
     }
 
-    const { isLoaded } = useLoadScript({
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-        libraries
+    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
+    const { isLoaded, loadError } = useLoadScript({
+        googleMapsApiKey,
+        libraries,
     })
 
     const onPlacesChanged = () => {
@@ -753,7 +772,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
         setSearchBox(ref);
     }
 
-    return (
+return (
         <div className="flex flex-1 items-center justify-center">
             <div className="max-w-7xl w-full">
                 <Return />
@@ -764,7 +783,22 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                             Aqui deberas ingresar los detalles de tu evento, artistas, tiendas, barras, empleados, etc.
                         </CardDescription>
                     </CardHeader>
-                    <Button disabled={createEvent.isPending} type="button" onClick={() => onSubmitCompleteEvent(completeEventForm.getValues())} variant={"default"}>
+                    <Button
+                        disabled={createEvent.isPending}
+                        type="button"
+                        onClick={() => {
+                            if (!googleMapsApiKey) {
+                                toast.error("Falta la clave de Google Maps. Añade NEXT_PUBLIC_GOOGLE_MAPS_API_KEY en .env")
+                                return
+                            }
+                            if (loadError) {
+                                toast.error("El mapa no pudo cargar. Verifica la API key y que Maps JavaScript API y Places API estén habilitados en Google Cloud Console.")
+                                return
+                            }
+                            completeEventForm.handleSubmit(onSubmitCompleteEvent, onValidationError)()
+                        }}
+                        variant={"default"}
+                    >
                         {createEvent.isPending ?
                             <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                             :
@@ -847,14 +881,10 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                             <div className={`flex w-full flex-col space-y-2 ${step === "DETAILS" ? "" : "hidden"}`}>
                                 <Card className="w-full">
                                     <CardHeader className="mb-0 pb-2">
-                                        <CardTitle>
-                                            Detalles del evento
-                                        </CardTitle>
-                                        <CardDescription className="max-w-3xl">
-                                            Descripción detalles evento.
-                                        </CardDescription>
+                                        <CardTitle>Detalles del evento</CardTitle>
+                                        <CardDescription className="max-w-3xl">Descripción detalles evento.</CardDescription>
                                     </CardHeader>
-                                    <CardContent className={`flex w-full flex-col space-y-2`}>
+                                    <CardContent className="flex w-full flex-col space-y-2">
                                         <Form {...completeEventForm}>
                                             <form onSubmit={completeEventForm.handleSubmit(onSubmitCompleteEvent)} className="flex w-full flex-col space-y-2">
                                                 <div className="flex w-full gap-5">
@@ -867,9 +897,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                 <FormControl>
                                                                     <Input placeholder="Ej: Vox Night Club" {...field} />
                                                                 </FormControl>
-                                                                <FormDescription>
-                                                                    Nombre visible al público.
-                                                                </FormDescription>
+                                                                <FormDescription>Nombre visible al público.</FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
                                                         )}
@@ -878,118 +906,76 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                         control={completeEventForm.control}
                                                         name="image"
                                                         render={({ field }) => (
-                                                            <FormItem  {...field} className="w-full">
+                                                            <FormItem {...field} className="w-full">
                                                                 <FormLabel>Foto*</FormLabel>
                                                                 <FormControl className="">
                                                                     <div className="flex items-center justify-center">
-                                                                        {completeEventForm.watch("image") ?
+                                                                        {completeEventForm.watch("image") ? (
                                                                             <div className="flex w-full items-start justify-start space-y-4 gap-5">
                                                                                 <Avatar className="h-20 w-20">
                                                                                     <AvatarImage style={{ objectFit: "cover" }} src={completeEventForm.watch("image") ?? ""} alt="profile-image" />
-                                                                                    <AvatarFallback>
-                                                                                        <Icons.spinner className=" h-5 w-5 animate-spin" />
-                                                                                    </AvatarFallback>
+                                                                                    <AvatarFallback><Icons.spinner className="h-5 w-5 animate-spin" /></AvatarFallback>
                                                                                 </Avatar>
-                                                                                <Button type="button" variant={"outline"} onClick={() => {
-                                                                                    completeEventForm.setValue("image", "")
-                                                                                }}>
-                                                                                    Cambiar imagen
-                                                                                </Button>
+                                                                                <Button type="button" variant="outline" onClick={() => completeEventForm.setValue("image", "")}>Cambiar imagen</Button>
                                                                             </div>
-                                                                            :
+                                                                        ) : (
                                                                             <Input
                                                                                 id="image"
                                                                                 type="file"
-                                                                                accept=".jpg, .jpeg"
+                                                                                accept=".jpg,.jpeg,.png"
                                                                                 onChange={async (e) => {
-                                                                                    if (e.target.files?.[0]) {
-                                                                                        const file = e.target.files[0]
-                                                                                        const formData = new FormData()
-                                                                                        formData.append('file', file)
-                                                                                        const response = await fetch('/api/upload', {
-                                                                                            method: 'POST',
-                                                                                            body: formData,
-                                                                                        })
-                                                                                        const result = await response.json()
-                                                                                        if (response.ok && result.url) {
-                                                                                            completeEventForm.setValue("image", result.url)
-                                                                                        } else {
-                                                                                            console.error('Upload Error:', result.error)
-                                                                                            alert(result.error ?? 'Error al subir la imagen.')
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                                }
+                                                                                    const file = e.target.files?.[0]
+                                                                                    if (!file) return
+                                                                                    const formData = new FormData()
+                                                                                    formData.append("file", file)
+                                                                                    const res = await fetch("/api/upload", { method: "POST", body: formData })
+                                                                                    const result = await res.json()
+                                                                                    if (res.ok && result.url) completeEventForm.setValue("image", result.url)
+                                                                                    else toast.error(result.error ?? "Error al subir la imagen.")
+                                                                                }}
                                                                             />
-
-                                                                        }
+                                                                        )}
                                                                     </div>
                                                                 </FormControl>
-                                                                <FormDescription>
-                                                                    Solo se permiten archivos .jpg y .jpeg de hasta 3MB.
-                                                                </FormDescription>
+                                                                <FormDescription>Solo se permiten archivos .jpg y .jpeg de hasta 3MB.</FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
                                                         )}
                                                     />
                                                 </div>
-                                                <FormField
-                                                    control={completeEventForm.control}
-                                                    name="about"
-                                                    render={({ field }) => (
+                                                <FormField control={completeEventForm.control} name="about" render={({ field }) => (
+                                                    <FormItem className="w-full">
+                                                        <FormLabel>Descripción</FormLabel>
+                                                        <FormControl><Textarea className="resize-none" {...field} /></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )} />
+                                                <div className="flex w-full gap-5">
+                                                    <FormField control={completeEventForm.control} name="startsAt" render={({ field }) => (
                                                         <FormItem className="w-full">
-                                                            <FormLabel>Descripción</FormLabel>
+                                                            <FormLabel>Comienza</FormLabel>
                                                             <FormControl>
-                                                                <Textarea
-                                                                    className="resize-none"
-                                                                    {...field}
-                                                                />
+                                                                <Input type="datetime-local" {...field} onChange={(e) => field.onChange(e.target.value)} />
                                                             </FormControl>
                                                             <FormMessage />
                                                         </FormItem>
-                                                    )}
-                                                />
-                                                <div className="flex w-full gap-5">
-                                                    <FormField
-                                                        control={completeEventForm.control}
-                                                        name="startsAt"
-                                                        render={({ field }) => (
-                                                            <FormItem className="w-full">
-                                                                <FormLabel>Comienza</FormLabel>
-                                                                <FormControl>
-                                                                    <Input
-                                                                        type="datetime-local"
-                                                                        {...field}
-                                                                        // defaultValue={customdayjs()}
-                                                                        onChange={(event) => field.onChange(event.target.value)}
-                                                                    />
-                                                                </FormControl>
-                                                                {/* <FormDescription>This is your public display name.</FormDescription> */}
-                                                                <FormMessage />
-                                                            </FormItem>
-                                                        )}
-                                                    />
-                                                    <FormField
-                                                        control={completeEventForm.control}
-                                                        name="endsAt"
-                                                        render={({ field }) => (
-                                                            <FormItem className="w-full">
-                                                                <FormLabel>Termina</FormLabel>
-                                                                <FormControl>
-                                                                    <Input
-                                                                        type="datetime-local"
-                                                                        {...field}
-                                                                        // defaultValue={customdayjs().add(1, "hour")}
-                                                                        // defaultValue={customdayjs().add(1, "hour").format("HH:mm")}
-                                                                        onChange={(event) => field.onChange(event.target.value)}
-                                                                    />
-                                                                </FormControl>
-                                                                {/* <FormDescription> This is your public display name. </FormDescription> */}
-                                                                <FormMessage />
-                                                            </FormItem>
-                                                        )}
-                                                    />
+                                                    )} />
+                                                    <FormField control={completeEventForm.control} name="endsAt" render={({ field }) => (
+                                                        <FormItem className="w-full">
+                                                            <FormLabel>Termina</FormLabel>
+                                                            <FormControl>
+                                                                <Input type="datetime-local" {...field} onChange={(e) => field.onChange(e.target.value)} />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )} />
                                                 </div>
+                                                <FormField control={completeEventForm.control} name="private" render={({ field }) => (
+                                                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                                        <FormLabel>Evento privado</FormLabel>
+                                                        <FormControl><Toggle checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                                                    </FormItem>
+                                                )} />
                                             </form>
                                         </Form>
                                     </CardContent>
@@ -997,58 +983,62 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                             </div>
                             <div className={`flex w-full flex-col space-y-2 ${step === "LOCATION" ? "" : "hidden"}`}>
                                 <Card className="w-full">
-                                    {!isLoaded ?
-                                        <div className="flex flex-1 items-center justify-center">
+                                    {!googleMapsApiKey ? (
+                                        <CardContent className="flex flex-1 flex-col items-center justify-center gap-2 py-8">
+                                            <p className="text-destructive font-medium">Falta la clave de Google Maps</p>
+                                            <p className="text-muted-foreground text-sm text-center max-w-md">Añade <code className="bg-muted px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> en tu archivo <code className="bg-muted px-1 rounded">.env</code>.</p>
+                                        </CardContent>
+                                    ) : loadError ? (
+                                        <CardContent className="flex flex-1 flex-col items-center justify-center gap-2 py-8">
+                                            <p className="text-destructive font-medium">El mapa no pudo cargar</p>
+                                            <p className="text-muted-foreground text-sm text-center max-w-md">Verifica la API key y que Maps JavaScript API y Places API estén habilitados.</p>
+                                        </CardContent>
+                                    ) : !isLoaded ? (
+                                        <div className="flex flex-1 items-center justify-center py-8">
                                             <Icons.spinner className="mr-2 h-10 w-10 animate-spin" />
+                                            <span className="text-sm text-muted-foreground">Cargando mapa...</span>
                                         </div>
-                                        :
+                                    ) : (
                                         <>
                                             <CardHeader className="mb-0 pb-2">
-                                                <CardTitle>
-                                                    Ubicación
-                                                </CardTitle>
-                                                <CardDescription className="max-w-3xl">
-                                                    Busca la dirección en google maps y se autocompletaran el resto de datos. No te preocupes, puedes corregirlos si es necesario.
-                                                </CardDescription>
+                                                <CardTitle>Ubicación</CardTitle>
+                                                <CardDescription className="max-w-3xl">Busca la dirección en Google Maps y se autocompletarán los datos.</CardDescription>
                                             </CardHeader>
-                                            <CardContent className={`flex w-full flex-col space-y-2`}>
+                                            <CardContent className="flex w-full flex-col space-y-2">
                                                 <div className="pb-4 w-full">
                                                     <Form {...searchForm}>
                                                         <form onSubmit={searchForm.handleSubmit(onSubmitSearch)} className="flex w-full flex-col">
-                                                            <FormField
-                                                                control={searchForm.control}
-                                                                name="search"
-                                                                render={({ field }) => (
-                                                                    <FormItem {...field} className="pb-2">
-                                                                        <FormLabel>Busqueda</FormLabel>
-                                                                        <FormControl>
-                                                                            <StandaloneSearchBox onPlacesChanged={onPlacesChanged} onLoad={onSearchBoxLoad}>
-                                                                                <Input type="text" placeholder="Buscar dirección en Google Maps" />
-                                                                            </StandaloneSearchBox>
-                                                                        </FormControl>
-                                                                        <FormDescription>
-                                                                            {/* Primero debes buscar la dirección en google maps . */}
-                                                                        </FormDescription>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
+                                                            <FormField control={searchForm.control} name="search" render={({ field }) => (
+                                                                <FormItem {...field} className="pb-2">
+                                                                    <FormLabel>Búsqueda</FormLabel>
+                                                                    <FormControl>
+                                                                        <StandaloneSearchBox onPlacesChanged={onPlacesChanged} onLoad={onSearchBoxLoad}>
+                                                                            <Input type="text" placeholder="Buscar dirección en Google Maps" {...field} />
+                                                                        </StandaloneSearchBox>
+                                                                    </FormControl>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )} />
                                                             <div className="w-full h-[30vh]">
                                                                 <GoogleMap
                                                                     options={{ backgroundColor: "#222", fullscreenControl: false, streetViewControl: false, mapTypeControl: false, styles: mapStyle, center: coords }}
-                                                                    onClick={(e: any) => {
-                                                                        console.log(JSON.stringify(e.latLng))
-                                                                        setCoords(e.latLng)
+                                                                    onClick={(e: google.maps.MapMouseEvent) => {
+                                                                        const latLng = e.latLng
+                                                                        if (!latLng) return
+                                                                        const lat = typeof latLng.lat === "function" ? latLng.lat() : latLng.lat
+                                                                        const lng = typeof latLng.lng === "function" ? latLng.lng() : latLng.lng
+                                                                        setCoords({ lat, lng })
+                                                                        completeEventForm.setValue("location.latitude", lat)
+                                                                        completeEventForm.setValue("location.longitude", lng)
                                                                     }}
                                                                     zoom={15}
-                                                                    // on={() => { console.log("center changed") }}
                                                                     center={coords}
                                                                     ref={mapRef}
-                                                                    mapContainerClassName="w-full h-full">
-                                                                    {completeEventForm.watch('location.latitude') && completeEventForm.watch('location.longitude') && <Marker position={{
-                                                                        lat: completeEventForm.watch('location.latitude'),
-                                                                        lng: completeEventForm.watch('location.longitude')
-                                                                    }} />}
+                                                                    mapContainerClassName="w-full h-full"
+                                                                >
+                                                                    {completeEventForm.watch("location.latitude") != null && completeEventForm.watch("location.longitude") != null && (
+                                                                        <Marker position={{ lat: completeEventForm.watch("location.latitude")!, lng: completeEventForm.watch("location.longitude")! }} />
+                                                                    )}
                                                                 </GoogleMap>
                                                             </div>
                                                         </form>
@@ -1057,166 +1047,78 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                 <Form {...completeEventForm}>
                                                     <form onSubmit={completeEventForm.handleSubmit(onSubmitCompleteEvent)} className="flex w-full flex-col space-y-2">
                                                         <div className="flex w-full gap-5">
-                                                            <FormField
-                                                                control={completeEventForm.control}
-                                                                name="location.name"
-                                                                render={({ field }) => (
-                                                                    <FormItem className="w-full">
-                                                                        <FormLabel>Nombre*</FormLabel>
-                                                                        <FormControl>
-                                                                            <Input placeholder="Ej: Vox Night Club" {...field} />
-                                                                        </FormControl>
-                                                                        <FormDescription>
-                                                                            Nombre visible al público.
-                                                                        </FormDescription>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
-                                                            <FormField
-                                                                control={completeEventForm.control}
-                                                                name="location.address"
-                                                                render={({ field }) => (
-                                                                    <FormItem className="w-full">
-                                                                        <FormLabel>Dirección*</FormLabel>
-                                                                        <FormControl>
-                                                                            <Input placeholder="Ej: Calle 123" {...field} />
-                                                                        </FormControl>
-                                                                        <FormDescription>
-
-                                                                        </FormDescription>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
-                                                            <FormField
-                                                                control={completeEventForm.control}
-                                                                name="location.image"
-                                                                render={({ field }) => (
-                                                                    <FormItem  {...field} className="w-full">
-                                                                        <FormLabel>Foto*</FormLabel>
-                                                                        <FormControl className="">
-                                                                            <div className="flex items-center justify-center">
-                                                                                {completeEventForm.watch("location.image") ?
-                                                                                    <div className="flex w-full items-start justify-start space-y-4 gap-5">
-                                                                                        <Avatar className="h-20 w-20">
-                                                                                            <AvatarImage style={{ objectFit: "cover" }} src={completeEventForm.watch("location.image") ?? ""} alt="profile-image" />
-                                                                                            <AvatarFallback>
-                                                                                                <Icons.spinner className=" h-5 w-5 animate-spin" />
-                                                                                            </AvatarFallback>
-                                                                                        </Avatar>
-                                                                                        <Button type="button" variant={"outline"} onClick={() => {
-                                                                                            completeEventForm.setValue("location.image", "")
-                                                                                        }}>
-                                                                                            Cambiar imagen
-                                                                                        </Button>
-                                                                                    </div>
-                                                                                    :
-                                                                                    <Input
-                                                                                        id="image"
-                                                                                        type="file"
-                                                                                        accept=".jpg, .jpeg"
-                                                                                        onChange={async (e) => {
-                                                                                            if (e.target.files?.[0]) {
-                                                                                                const file = e.target.files[0]
-                                                                                                const formData = new FormData()
-                                                                                                formData.append('file', file)
-                                                                                                const response = await fetch('/api/upload', {
-                                                                                                    method: 'POST',
-                                                                                                    body: formData,
-                                                                                                })
-                                                                                                const result = await response.json()
-                                                                                                if (response.ok && result.url) {
-                                                                                                    completeEventForm.setValue("location.image", result.url)
-                                                                                                } else {
-                                                                                                    console.error('Upload Error:', result.error)
-                                                                                                    alert(result.error ?? 'Error al subir la imagen.')
-                                                                                                }
-                                                                                            }
-                                                                                        }
-                                                                                        }
-                                                                                    />
-
-                                                                                }
-                                                                            </div>
-                                                                        </FormControl>
-                                                                        <FormDescription>
-                                                                            Solo se permiten archivos .jpg y .jpeg de hasta 3MB.
-                                                                        </FormDescription>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
+                                                            <FormField control={completeEventForm.control} name="location.name" render={({ field }) => (
+                                                                <FormItem className="w-full"><FormLabel>Nombre*</FormLabel><FormControl><Input placeholder="Ej: Vox Night Club" {...field} /></FormControl><FormMessage /></FormItem>
+                                                            )} />
+                                                            <FormField control={completeEventForm.control} name="location.address" render={({ field }) => (
+                                                                <FormItem className="w-full"><FormLabel>Dirección*</FormLabel><FormControl><Input placeholder="Ej: Calle 123" {...field} /></FormControl><FormMessage /></FormItem>
+                                                            )} />
+                                                            <FormField control={completeEventForm.control} name="location.image" render={({ field }) => (
+                                                                <FormItem {...field} className="w-full">
+                                                                    <FormLabel>Foto*</FormLabel>
+                                                                    <FormControl className="">
+                                                                        <div className="flex items-center justify-center">
+                                                                            {completeEventForm.watch("location.image") ? (
+                                                                                <div className="flex w-full items-start justify-start space-y-4 gap-5">
+                                                                                    <Avatar className="h-20 w-20">
+                                                                                        <AvatarImage style={{ objectFit: "cover" }} src={completeEventForm.watch("location.image") ?? ""} alt="profile-image" />
+                                                                                        <AvatarFallback><Icons.spinner className="h-5 w-5 animate-spin" /></AvatarFallback>
+                                                                                    </Avatar>
+                                                                                    <Button type="button" variant="outline" onClick={() => completeEventForm.setValue("location.image", "")}>Cambiar imagen</Button>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <Input type="file" accept=".jpg,.jpeg,.png" onChange={async (e) => {
+                                                                                    const file = e.target.files?.[0]
+                                                                                    if (!file) return
+                                                                                    const formData = new FormData()
+                                                                                    formData.append("file", file)
+                                                                                    formData.append("prefix", "events")
+                                                                                    const res = await fetch("/api/upload", { method: "POST", body: formData })
+                                                                                    const result = await res.json()
+                                                                                    if (res.ok && result.url) completeEventForm.setValue("location.image", result.url)
+                                                                                    else toast.error(result.error ?? "Error al subir la imagen.")
+                                                                                }} />
+                                                                            )}
+                                                                        </div>
+                                                                    </FormControl>
+                                                                    <FormDescription>Solo se permiten archivos .jpg y .jpeg de hasta 3MB.</FormDescription>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )} />
                                                         </div>
-                                                        <div className='flex gap-5'>
-                                                            <FormField
-                                                                control={completeEventForm.control}
-                                                                name="location.country"
-                                                                render={({ field }) => (
-                                                                    <FormItem className="w-full">
-                                                                        <FormLabel>País *</FormLabel>
-                                                                        <FormControl>
-                                                                            <div className='w-full flex-1 rounded-md border px-2 bg-background'>
-                                                                                <CountryDropdown
-                                                                                    value={field.value as any}
-                                                                                    valueType="short"
-                                                                                    onChange={(val) => field.onChange(val)}
-                                                                                    defaultOptionLabel="Seleccionar"
-                                                                                    classes='py-[.6rem] w-full text-sm bg-background'
-                                                                                />
-                                                                            </div>
-                                                                        </FormControl>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
-                                                            <FormField
-                                                                control={completeEventForm.control}
-                                                                name="location.state"
-                                                                render={({ field }) => (
-                                                                    <FormItem className="w-full">
-                                                                        <FormLabel>Provincia *</FormLabel>
-                                                                        <FormControl>
-                                                                            <div className='w-full flex-1 rounded-md border px-2 bg-background'>
-                                                                                <RegionDropdown
-                                                                                    country={completeEventForm.watch('location.country')}
-                                                                                    value={field.value as any}
-                                                                                    defaultOptionLabel="Seleccionar"
-                                                                                    countryValueType="short"
-                                                                                    classes='py-[.6rem] w-full text-sm bg-background'
-                                                                                    onChange={(val) => field.onChange(val)} />
-                                                                            </div>
-                                                                        </FormControl>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
-                                                            <FormField
-                                                                control={completeEventForm.control}
-                                                                name="location.city"
-                                                                render={({ field }) => (
-                                                                    <FormItem className="w-full">
-                                                                        <FormLabel>Ciudad *</FormLabel>
-                                                                        <FormControl>
-                                                                            <div className='w-full flex-1'>
-                                                                                <Input placeholder="Ej: CABA" {...field} />
-                                                                            </div>
-                                                                        </FormControl>
-                                                                        <FormMessage />
-                                                                    </FormItem>
-                                                                )}
-                                                            />
+                                                        <div className="flex w-full gap-5">
+                                                            <FormField control={completeEventForm.control} name="location.country" render={({ field }) => (
+                                                                <FormItem className="w-full">
+                                                                    <FormLabel>País *</FormLabel>
+                                                                    <FormControl>
+                                                                        <div className="w-full flex-1 rounded-md border px-2 bg-background">
+                                                                            <CountryDropdown value={field.value as string} valueType="short" onChange={(val) => field.onChange(val)} defaultOptionLabel="Seleccionar" classes="py-[.6rem] w-full text-sm bg-background" />
+                                                                        </div>
+                                                                    </FormControl>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )} />
+                                                            <FormField control={completeEventForm.control} name="location.state" render={({ field }) => (
+                                                                <FormItem className="w-full">
+                                                                    <FormLabel>Provincia *</FormLabel>
+                                                                    <FormControl>
+                                                                        <div className="w-full flex-1 rounded-md border px-2 bg-background">
+                                                                            <RegionDropdown country={completeEventForm.watch("location.country")} value={field.value as string} defaultOptionLabel="Seleccionar" countryValueType="short" classes="py-[.6rem] w-full text-sm bg-background" onChange={(val) => field.onChange(val)} />
+                                                                        </div>
+                                                                    </FormControl>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )} />
+                                                            <FormField control={completeEventForm.control} name="location.city" render={({ field }) => (
+                                                                <FormItem className="w-full"><FormLabel>Ciudad *</FormLabel><FormControl><Input placeholder="Ej: CABA" {...field} /></FormControl><FormMessage /></FormItem>
+                                                            )} />
                                                         </div>
                                                     </form>
                                                 </Form>
-
                                             </CardContent>
                                         </>
-                                    }
+                                    )}
                                 </Card>
-                                <div>
-
-                                </div>
                             </div>
                             <div className={`flex w-full gap-5 ${step === "GATES" ? "" : "hidden"}`}>
                                 <Card className="flex-1">
@@ -1225,7 +1127,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                             Puertas
                                         </CardTitle>
                                         <CardDescription className="max-w-3xl">
-                                            Descripción puertas.
+                                            Descripci├│n puertas.
                                         </CardDescription>
                                     </CardHeader>
                                     <Form {...gateForm}>
@@ -1243,7 +1145,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                         <Input placeholder="Ej: Vox Night Club" {...field} />
                                                                     </FormControl>
                                                                     <FormDescription>
-                                                                        Nombre visible al público.
+                                                                        Nombre visible al p├║blico.
                                                                     </FormDescription>
                                                                     <FormMessage />
                                                                 </FormItem>
@@ -1256,7 +1158,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                             name="about"
                                                             render={({ field }) => (
                                                                 <FormItem className="w-full">
-                                                                    <FormLabel>Descripción</FormLabel>
+                                                                    <FormLabel>Descripci├│n</FormLabel>
                                                                     <FormControl>
                                                                         <Textarea
                                                                             className="resize-none"
@@ -1391,7 +1293,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                             Mostradores
                                         </CardTitle>
                                         <CardDescription className="max-w-3xl">
-                                            Descripción barras.
+                                            Descripci├│n barras.
                                         </CardDescription>
                                     </CardHeader>
                                     <Form {...counterForm}>
@@ -1420,7 +1322,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                         </Select>
                                                                     </FormControl>
                                                                     <FormDescription>
-                                                                        De aquí se sacarán los productos
+                                                                        De aqu├¡ se sacar├ín los productos
                                                                     </FormDescription>
                                                                     <FormMessage />
                                                                 </FormItem>
@@ -1436,7 +1338,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                         <Input placeholder="Ej: Vox Night Club" {...field} />
                                                                     </FormControl>
                                                                     <FormDescription>
-                                                                        Nombre visible al público.
+                                                                        Nombre visible al p├║blico.
                                                                     </FormDescription>
                                                                     <FormMessage />
                                                                 </FormItem>
@@ -1449,7 +1351,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                             name="about"
                                                             render={({ field }) => (
                                                                 <FormItem className="w-full">
-                                                                    <FormLabel>Descripción</FormLabel>
+                                                                    <FormLabel>Descripci├│n</FormLabel>
                                                                     <FormControl>
                                                                         <Textarea
                                                                             className="resize-none"
@@ -1590,7 +1492,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                             Tickets
                                         </CardTitle>
                                         <CardDescription className="max-w-3xl">
-                                            Descripción tickets.
+                                            Descripci├│n tickets.
                                         </CardDescription>
                                     </CardHeader>
                                     <Form {...ticketForm}>
@@ -1607,7 +1509,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                     <Input placeholder="Ej: Vox Night Club" {...field} />
                                                                 </FormControl>
                                                                 <FormDescription>
-                                                                    Nombre visible al público.
+                                                                    Nombre visible al p├║blico.
                                                                 </FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -1620,7 +1522,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                         name="about"
                                                         render={({ field }) => (
                                                             <FormItem className="w-full">
-                                                                <FormLabel>Descripción</FormLabel>
+                                                                <FormLabel>Descripci├│n</FormLabel>
                                                                 <FormControl>
                                                                     <Textarea
                                                                         className="resize-none"
@@ -1746,7 +1648,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                             Artistas
                                         </CardTitle>
                                         <CardDescription className="max-w-3xl">
-                                            Descripción artistas.
+                                            Descripci├│n artistas.
                                         </CardDescription>
                                     </CardHeader>
                                     <Form {...artistForm}>
@@ -1763,7 +1665,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                     <Input placeholder="Ej: Vox Night Club" {...field} />
                                                                 </FormControl>
                                                                 <FormDescription>
-                                                                    Nombre visible al público.
+                                                                    Nombre visible al p├║blico.
                                                                 </FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -1797,21 +1699,18 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                                 type="file"
                                                                                 accept=".jpg, .jpeg"
                                                                                 onChange={async (e) => {
-                                                                                    if (e.target.files?.[0]) {
-                                                                                        const file = e.target.files[0]
-                                                                                        const formData = new FormData()
-                                                                                        formData.append('file', file)
-                                                                                        const response = await fetch('/api/upload', {
-                                                                                            method: 'POST',
-                                                                                            body: formData,
-                                                                                        })
-                                                                                        const result = await response.json()
-                                                                                        if (response.ok && result.url) {
-                                                                                            artistForm.setValue("image", result.url)
-                                                                                        } else {
-                                                                                            console.error('Upload Error:', result.error)
-                                                                                            alert(result.error ?? 'Error al subir la imagen.')
-                                                                                        }
+                                                                                    const file = e.target.files?.[0]
+                                                                                    if (!file) return
+                                                                                    const formData = new FormData()
+                                                                                    formData.append("file", file)
+                                                                                    formData.append("prefix", "artists")
+                                                                                    const response = await fetch("/api/upload", { method: "POST", body: formData })
+                                                                                    const result = (await response.json()) as { url?: string; error?: string }
+                                                                                    if (response.ok && result.url) {
+                                                                                        artistForm.setValue("image", result.url)
+                                                                                        toast.success("Imagen subida correctamente")
+                                                                                    } else {
+                                                                                        toast.error(result.error ?? "Error al subir la imagen.")
                                                                                     }
                                                                                 }
                                                                                 }
@@ -1883,7 +1782,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                             Depositos
                                         </CardTitle>
                                         <CardDescription className="max-w-3xl">
-                                            Descripción depositos.
+                                            Descripci├│n depositos.
                                         </CardDescription>
                                     </CardHeader>
                                     <Form {...depositForm}>
@@ -1900,7 +1799,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                     <Input placeholder="Ej: Vox Night Club" {...field} />
                                                                 </FormControl>
                                                                 <FormDescription>
-                                                                    Nombre visible al público.
+                                                                    Nombre visible al p├║blico.
                                                                 </FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -1913,7 +1812,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                         name="about"
                                                         render={({ field }) => (
                                                             <FormItem className="w-full">
-                                                                <FormLabel>Descripción</FormLabel>
+                                                                <FormLabel>Descripci├│n</FormLabel>
                                                                 <FormControl>
                                                                     <Textarea
                                                                         className="resize-none"
@@ -2023,7 +1922,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                             Productos en un deposito
                                         </CardTitle>
                                         <CardDescription className="max-w-3xl">
-                                            Descripción productos en un deposito.
+                                            Descripci├│n productos en un deposito.
                                         </CardDescription>
                                     </CardHeader>
                                     <Form {...productOnDepositForm}>
@@ -2051,7 +1950,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                     </Select>
                                                                 </FormControl>
                                                                 <FormDescription>
-                                                                    De aquí se sacarán los productos
+                                                                    De aqu├¡ se sacar├ín los productos
                                                                 </FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -2078,7 +1977,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                     </Select>
                                                                 </FormControl>
                                                                 <FormDescription>
-                                                                    De aquí se sacarán los productos
+                                                                    De aqu├¡ se sacar├ín los productos
                                                                 </FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -2199,7 +2098,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                             Productos
                                         </CardTitle>
                                         <CardDescription className="max-w-3xl">
-                                            Descripción productos.
+                                            Descripci├│n productos.
                                         </CardDescription>
                                     </CardHeader>
                                     <Form {...productForm}>
@@ -2216,7 +2115,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                     <Input placeholder="Ej: Vox Night Club" {...field} />
                                                                 </FormControl>
                                                                 <FormDescription>
-                                                                    Nombre visible al público.
+                                                                    Nombre visible al p├║blico.
                                                                 </FormDescription>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -2248,53 +2147,30 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                             <Input
                                                                                 id="image"
                                                                                 type="file"
-                                                                                accept=".jpg, .jpeg"
+                                                                                accept=".jpg,.jpeg,.png"
+                                                                                disabled={productImageUploading}
                                                                                 onChange={async (e) => {
-                                                                                    console.log(e.target.files, "EVENT")
-                                                                                    if (e.target.files?.[0]) {
-                                                                                        const file = e.target.files[0]
-
-                                                                                        const response = await fetch(
-                                                                                            process.env.NEXT_PUBLIC_BASE_URL + '/api/upload',
-                                                                                            {
-                                                                                                method: 'POST',
-                                                                                                headers: {
-                                                                                                    'Content-Type': 'application/json',
-                                                                                                },
-                                                                                                body: JSON.stringify({ filename: file.name, contentType: file.type }),
-                                                                                            }
-                                                                                        )
-
-                                                                                        if (response.ok) {
-                                                                                            const { url, fields } = await response.json()
-
-                                                                                            console.log(url, "url", fields, "fields")
-
-                                                                                            const formData = new FormData()
-                                                                                            Object.entries(fields).forEach(([key, value]) => {
-                                                                                                formData.append(key, value as any)
-                                                                                            })
-                                                                                            formData.append('file', file)
-
-                                                                                            const uploadResponse = await fetch(url, {
-                                                                                                method: 'POST',
-                                                                                                body: formData,
-                                                                                            })
-
-                                                                                            if (uploadResponse.ok) {
-                                                                                                productForm.setValue("image", "https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key)
-                                                                                                console.log("https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key, "   URL DEL ARCHIVO")
-                                                                                                // alert('Upload successful!')
-                                                                                            } else {
-                                                                                                console.error('S3 Upload Error:', uploadResponse)
-                                                                                                // alert('Upload failed.')
-                                                                                            }
+                                                                                    const file = e.target.files?.[0]
+                                                                                    if (!file) return
+                                                                                    setProductImageUploading(true)
+                                                                                    try {
+                                                                                        const formData = new FormData()
+                                                                                        formData.append("file", file)
+                                                                                        formData.append("prefix", "products")
+                                                                                        const response = await fetch("/api/upload", { method: "POST", body: formData })
+                                                                                        const result = (await response.json()) as { url?: string; error?: string }
+                                                                                        if (response.ok && result.url) {
+                                                                                            productForm.setValue("image", result.url)
+                                                                                            toast.success("Imagen subida correctamente")
                                                                                         } else {
-                                                                                            alert('Failed to get pre-signed URL.')
+                                                                                            toast.error(result.error ?? "Error al subir la imagen.")
                                                                                         }
+                                                                                    } catch (err) {
+                                                                                        toast.error(err instanceof Error ? err.message : "Error de red")
+                                                                                    } finally {
+                                                                                        setProductImageUploading(false)
                                                                                     }
-                                                                                }
-                                                                                }
+                                                                                }}
                                                                             />
                                                                         }
                                                                     </div>
@@ -2313,7 +2189,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                         name="about"
                                                         render={({ field }) => (
                                                             <FormItem className="w-full">
-                                                                <FormLabel>Descripción</FormLabel>
+                                                                <FormLabel>Descripci├│n</FormLabel>
                                                                 <FormControl>
                                                                     <Textarea
                                                                         className="resize-none"
@@ -2405,7 +2281,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                                                                             <AvatarFallback>AR</AvatarFallback>
                                                                         </Avatar>
                                                                         <div className='space-y-1'>
-                                                                            <h1 className="font-bold"><h1>{prod.name} {prod.type === 'FOOD' ? '(COMIDA)' : prod.type === 'DRINK' ? '(BEBIDA)' : '(CONSUMIBLE)'}</h1></h1>
+                                                                            <h1 className="font-bold">{prod.name} {prod.type === "FOOD" ? "(COMIDA)" : prod.type === "DRINK" ? "(BEBIDA)" : "(CONSUMIBLE)"}</h1>
                                                                             <p>
                                                                                 {prod.about}
                                                                             </p>
@@ -2447,7 +2323,7 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
                         </div>
                     </div>
                 </CardContent>
-            </div >
-        </div >
-    )
+            </div>
+        </div>
+    );
 }

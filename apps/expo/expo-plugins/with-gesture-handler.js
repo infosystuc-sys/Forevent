@@ -58,6 +58,7 @@ rootProject.ext.REACT_NATIVE_NODE_MODULES_DIR = file("\${rootDir}/../../../node_
         );
         fs.writeFileSync(rootBuildGradlePath, rootGradle);
       }
+      return config;
     },
   ]);
 

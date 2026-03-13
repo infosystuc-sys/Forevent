@@ -655,6 +655,33 @@ export const eventRouter = createTRPCRouter({
     return
   }),
 
+  updateStatus: protectedProcedure.input(z.object({
+    eventId: z.string(),
+    status: z.nativeEnum(Status),
+  })).mutation(async ({ ctx, input }) => {
+    const event = await ctx.prisma.event.findUnique({
+      where: { id: input.eventId },
+      select: { id: true, guildId: true },
+    });
+    if (!event) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Evento no encontrado" });
+    }
+    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
+      where: {
+        guildId: event.guildId,
+        user: { email: ctx.session.user.email ?? undefined },
+        discharged: true,
+      },
+    });
+    if (!userOnGuild) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para modificar este evento" });
+    }
+    return await ctx.prisma.event.update({
+      where: { id: input.eventId },
+      data: { status: input.status },
+    });
+  }),
+
   delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),

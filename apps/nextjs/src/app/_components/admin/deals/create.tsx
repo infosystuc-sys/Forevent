@@ -117,6 +117,7 @@ const productSchema = z.object({
 
 function CreateDeal({ initialProducts, eventId }: { initialProducts: Awaited<RouterOutputs["web"]["event"]["products"]>, eventId: string }) {
     const [open, setOpen] = useState(false)
+    const [dealUploading, setDealUploading] = useState(false)
     const [rowSelection, setRowSelection] = useState({})
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -289,53 +290,36 @@ function CreateDeal({ initialProducts, eventId }: { initialProducts: Awaited<Rou
                                                             <Input
                                                                 id="image"
                                                                 type="file"
-                                                                accept=".jpg, .jpeg"
+                                                                accept=".jpg,.jpeg,.png"
+                                                                disabled={dealUploading}
                                                                 onChange={async (e) => {
-                                                                    console.log(e.target.files, "EVENT")
-                                                                    if (e.target.files && e.target.files[0]) {
-                                                                        const file = e.target.files[0]
-
-                                                                        const response = await fetch(
-                                                                            process.env.NEXT_PUBLIC_BASE_URL + '/api/upload',
-                                                                            {
-                                                                                method: 'POST',
-                                                                                headers: {
-                                                                                    'Content-Type': 'application/json',
-                                                                                },
-                                                                                body: JSON.stringify({ filename: file.name, contentType: file.type }),
-                                                                            }
-                                                                        )
-
-                                                                        if (response.ok) {
-                                                                            const { url, fields } = await response.json()
-
-                                                                            console.log(url, "url", fields, "fields")
-
-                                                                            const formData = new FormData()
-                                                                            Object.entries(fields).forEach(([key, value]) => {
-                                                                                formData.append(key, value! as any)
-                                                                            })
-                                                                            formData.append('file', file)
-
-                                                                            const uploadResponse = await fetch(url, {
-                                                                                method: 'POST',
-                                                                                body: formData,
-                                                                            })
-
-                                                                            if (uploadResponse.ok) {
-                                                                                dealForm.setValue("image", "https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key)
-                                                                                console.log("https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key, "   URL DEL ARCHIVO")
-                                                                                // alert('Upload successful!')
-                                                                            } else {
-                                                                                console.error('S3 Upload Error:', uploadResponse)
-                                                                                // alert('Upload failed.')
-                                                                            }
+                                                                    const file = e.target.files?.[0]
+                                                                    if (!file) return
+                                                                    setDealUploading(true)
+                                                                    try {
+                                                                        const formData = new FormData()
+                                                                        formData.append('file', file)
+                                                                        formData.append('prefix', 'deals')
+                                                                        const response = await fetch('/api/upload', {
+                                                                            method: 'POST',
+                                                                            body: formData,
+                                                                        })
+                                                                        const result = (await response.json()) as { url?: string; error?: string }
+                                                                        if (response.ok && result.url) {
+                                                                            dealForm.setValue("image", result.url)
+                                                                            toast.success("Imagen subida correctamente")
                                                                         } else {
-                                                                            alert('Failed to get pre-signed URL.')
+                                                                            console.error("[deals/upload] Error:", result.error)
+                                                                            toast.error(result.error ?? "Error al subir la imagen.")
                                                                         }
+                                                                    } catch (err) {
+                                                                        const msg = err instanceof Error ? err.message : "Error de red"
+                                                                        console.error("[deals/upload] Error:", err)
+                                                                        toast.error(msg)
+                                                                    } finally {
+                                                                        setDealUploading(false)
                                                                     }
-                                                                }
-                                                                }
+                                                                }}
                                                             />
                                                         }
                                                     </div>

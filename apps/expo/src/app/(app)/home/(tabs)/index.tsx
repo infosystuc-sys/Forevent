@@ -61,21 +61,31 @@ const CATEGORIES = [
 
 export default function Page() {
     const insets = useSafeAreaInsets()
-    const [search, setSearch]     = useState('')
-    const [activeTab, setActiveTab] = useState('ALL')
+    const [search, setSearch]       = useState('')
+    const [activeTab, setActiveTab] = useState<'ALL' | 'FIESTAS' | 'BARES' | 'CULTURA'>('ALL')
 
-    const events = api.mobile.event.highlighted.useQuery(
+    const highlighted = api.mobile.event.highlighted.useQuery(
         { latitude: 0, longitude: 0 },
         {
             staleTime: 0,
             refetchOnMount: 'always',
             refetchOnWindowFocus: true,
+            enabled: activeTab !== 'ALL',
         }
     )
 
-    const isLoading  = events.isLoading
-    const isRefresh  = events.isFetching && !events.isLoading
-    const data       = events.data ?? []
+    const allEvents = api.mobile.event.all.useQuery(undefined, {
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true,
+        enabled: activeTab === 'ALL',
+    })
+
+    const isLoading = activeTab === 'ALL' ? allEvents.isLoading : highlighted.isLoading
+    const isRefresh = activeTab === 'ALL'
+        ? allEvents.isFetching && !allEvents.isLoading
+        : highlighted.isFetching && !highlighted.isLoading
+    const data = (activeTab === 'ALL' ? allEvents.data : highlighted.data) ?? []
 
     return (
         <View style={[styles.root, { backgroundColor: C.bg }]}>
@@ -156,7 +166,13 @@ export default function Page() {
                     refreshControl={
                         <RefreshControl
                             refreshing={isRefresh}
-                            onRefresh={() => events.refetch()}
+                            onRefresh={() => {
+                                if (activeTab === 'ALL') {
+                                    allEvents.refetch()
+                                } else {
+                                    highlighted.refetch()
+                                }
+                            }}
                             tintColor={C.magenta}
                         />
                     }

@@ -20,6 +20,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
+        implementation project(':react-native-background-timer')
         classpath('com.android.tools.build:gradle')
         classpath('com.facebook.react:react-native-gradle-plugin')
     }
@@ -27,7 +28,7 @@ buildscript {
 
 apply plugin: "com.facebook.react.rootproject"
 
-// Monorepo: apps/expo/android -> ../../../ = raíz workspace
+// Monorepo pnpm: react-native está en la raíz del workspace
 rootProject.ext.REACT_NATIVE_NODE_MODULES_DIR = file("${rootDir}/../../../node_modules/react-native")
 
 allprojects {

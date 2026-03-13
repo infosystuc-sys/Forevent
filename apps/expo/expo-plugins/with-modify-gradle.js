@@ -7,7 +7,7 @@
 /** @type {import("@expo/config-plugins").ConfigPlugin} */
 const defineConfig = (config) => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require("@expo/config-plugins").withProjectBuildGradle(
+  const result = require("@expo/config-plugins").withProjectBuildGradle(
     config,
     (config) => {
       if (!config.modResults.contents.includes("ext.getPackageJsonVersion =")) {
@@ -45,6 +45,7 @@ const defineConfig = (config) => {
       return config;
     },
   );
+  return result ?? config;
 };
 
 module.exports = defineConfig;

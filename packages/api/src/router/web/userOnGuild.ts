@@ -93,12 +93,20 @@ export const userOnGuildRouter = createTRPCRouter({
         })
 
         if (previousInvite) {
-            return await ctx.resend.emails.send({
+            const sendEmail = await ctx.resend.emails.send({
                 from: `Forevent <${NOREPLY_EMAIL}>`,
                 to: [body.email],
                 subject: "Te han invitado a unirte a una organización",
                 react: GuildInviteEmailTemplate({ link: `${HOST_URL}/account/invites`, name: user?.name as string, guildName: guild.name })
             })
+            if (sendEmail.error) {
+                console.error("[createInvite] Resend error (reinvite):", sendEmail.error)
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `Error al enviar el correo: ${sendEmail.error.message}`,
+                })
+            }
+            return sendEmail
         } else {
 
             // const token = (Math.floor(Math.random() * 90000) + 10000).toString()
@@ -124,7 +132,13 @@ export const userOnGuildRouter = createTRPCRouter({
                 subject: "Te han invitado a unirte a una organización",
                 react: GuildInviteEmailTemplate({ link: `${HOST_URL}/account/invites`, name: user?.name as string, guildName: guild.name })
             })
-
+            if (sendEmail.error) {
+                console.error("[createInvite] Resend error:", sendEmail.error)
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: `Error al enviar el correo: ${sendEmail.error.message}`,
+                })
+            }
             return sendEmail
         }
     }),

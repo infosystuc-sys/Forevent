@@ -2,10 +2,12 @@ import { uploadBufferToStorage } from "~/lib/s3";
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
+/** Prefixos: events, products, deals, guilds. Bucket: events (Supabase Storage). */
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file");
+    const prefix = (formData.get("prefix") as string) || "events";
 
     if (!(file instanceof File)) {
       return Response.json({ error: "No se recibió ningún archivo." }, { status: 400 });
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const publicUrl = await uploadBufferToStorage(buffer, file.name, file.type);
+    const publicUrl = await uploadBufferToStorage(buffer, file.name, file.type, prefix);
 
     return Response.json({ url: publicUrl });
   } catch (error: unknown) {

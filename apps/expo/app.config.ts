@@ -5,11 +5,12 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
-// Variable exacta: EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-const mapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
-if (!mapsApiKey) {
-  console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY vacía. El mapa mostrará gris.");
-  console.warn("[app.config] Define la variable en .env en la raíz del monorepo y ejecuta: pnpm dev:android");
+// Variable exacta: EXPO_PUBLIC_GOOGLE_MAPS_API_KEY (opcional; fallback para que el SDK nativo de Android siempre reciba una key)
+const envMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
+// Clave directa para Android: el SDK nativo la lee de android.config.googleMaps.apiKey en el build
+const ANDROID_GOOGLE_MAPS_API_KEY = envMapsKey || "AIzaSyAqSQqUDteS9L2j-svtzEvn_jo1G3kHzdw";
+if (!envMapsKey) {
+  console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY vacía; usando clave por defecto para Android.");
 }
 
 const defineConfig = (): ExpoConfig => ({
@@ -54,10 +55,9 @@ const defineConfig = (): ExpoConfig => ({
     },
     permissions: ["ACCESS_BACKGROUND_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
     config: {
-      // Google Maps API Key para react-native-maps en Android.
-      // Agregar EXPO_PUBLIC_GOOGLE_MAPS_API_KEY en .env o en EAS Secrets.
+      // Google Maps API Key para react-native-maps en Android (SDK nativo la lee en el build).
       googleMaps: {
-        apiKey: mapsApiKey,
+        apiKey: ANDROID_GOOGLE_MAPS_API_KEY,
       },
     },
   },
@@ -65,8 +65,7 @@ const defineConfig = (): ExpoConfig => ({
     eas: {
       projectId: "6de875d0-f6ce-461b-9ee6-4f169a1f328e",
     },
-    // Exponer flag para que el frontend verifique si la API key está configurada
-    googleMapsApiKeyConfigured: !!mapsApiKey.trim(),
+    googleMapsApiKeyConfigured: !!ANDROID_GOOGLE_MAPS_API_KEY.trim(),
   },
   experiments: {
     tsconfigPaths: true,

@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { Button } from '@forevent/ui/button'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -25,6 +26,7 @@ const productSchema = z.object({
 function CreateProduct({ eventId }: { eventId: string }) {
     const utils = api.useUtils()
     const router = useRouter()
+    const [uploading, setUploading] = useState(false)
     const productForm = useForm<z.infer<typeof productSchema>>({
         resolver: zodResolver(productSchema),
         defaultValues: {
@@ -109,12 +111,12 @@ function CreateProduct({ eventId }: { eventId: string }) {
                                             <FormLabel>Foto*</FormLabel>
                                             <FormControl className="">
                                                 <div className="flex items-center justify-center">
-                                                    {productForm.watch("image") ?
+                                                    {productForm.watch("image")                                                         ?
                                                         <div className="flex w-full items-start justify-start space-y-4 gap-5">
                                                             <Avatar className="h-20 w-20">
                                                                 <AvatarImage style={{ objectFit: "cover" }} src={productForm.watch("image") ?? ""} alt="profile-image" />
                                                                 <AvatarFallback>
-                                                                    <Icons.spinner className=" h-5 w-5 animate-spin" />
+                                                                    <Icons.spinner className="h-5 w-5 animate-spin" />
                                                                 </AvatarFallback>
                                                             </Avatar>
                                                             <Button type="button" variant={"outline"} onClick={() => {
@@ -127,53 +129,36 @@ function CreateProduct({ eventId }: { eventId: string }) {
                                                         <Input
                                                             id="image"
                                                             type="file"
-                                                            accept=".jpg, .jpeg"
+                                                            accept=".jpg,.jpeg,.png"
+                                                            disabled={uploading}
                                                             onChange={async (e) => {
-                                                                console.log(e.target.files, "EVENT")
-                                                                if (e.target.files && e.target.files[0]) {
-                                                                    const file = e.target.files[0]
-
-                                                                    const response = await fetch(
-                                                                        process.env.NEXT_PUBLIC_BASE_URL + '/api/upload',
-                                                                        {
-                                                                            method: 'POST',
-                                                                            headers: {
-                                                                                'Content-Type': 'application/json',
-                                                                            },
-                                                                            body: JSON.stringify({ filename: file.name, contentType: file.type }),
-                                                                        }
-                                                                    )
-
-                                                                    if (response.ok) {
-                                                                        const { url, fields } = await response.json()
-
-                                                                        console.log(url, "url", fields, "fields")
-
-                                                                        const formData = new FormData()
-                                                                        Object.entries(fields).forEach(([key, value]) => {
-                                                                            formData.append(key, value!)
-                                                                        })
-                                                                        formData.append('file', file)
-
-                                                                        const uploadResponse = await fetch(url, {
-                                                                            method: 'POST',
-                                                                            body: formData,
-                                                                        })
-
-                                                                        if (uploadResponse.ok) {
-                                                                            productForm.setValue("image", "https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key)
-                                                                            console.log("https://d2l7xb0l2x2ws7.cloudfront.net/" + fields.key, "   URL DEL ARCHIVO")
-                                                                            // alert('Upload successful!')
-                                                                        } else {
-                                                                            console.error('S3 Upload Error:', uploadResponse)
-                                                                            // alert('Upload failed.')
-                                                                        }
+                                                                const file = e.target.files?.[0]
+                                                                if (!file) return
+                                                                setUploading(true)
+                                                                try {
+                                                                    const formData = new FormData()
+                                                                    formData.append('file', file)
+                                                                    formData.append('prefix', 'products')
+                                                                    const response = await fetch('/api/upload', {
+                                                                        method: 'POST',
+                                                                        body: formData,
+                                                                    })
+                                                                    const result = (await response.json()) as { url?: string; error?: string }
+                                                                    if (response.ok && result.url) {
+                                                                        productForm.setValue("image", result.url)
+                                                                        toast.success("Imagen subida correctamente")
                                                                     } else {
-                                                                        alert('Failed to get pre-signed URL.')
+                                                                        console.error("[products/upload] Error:", result.error)
+                                                                        toast.error(result.error ?? "Error al subir la imagen.")
                                                                     }
+                                                                } catch (err) {
+                                                                    const msg = err instanceof Error ? err.message : "Error de red"
+                                                                    console.error("[products/upload] Error:", err)
+                                                                    toast.error(msg)
+                                                                } finally {
+                                                                    setUploading(false)
                                                                 }
-                                                            }
-                                                            }
+                                                            }}
                                                         />
                                                     }
                                                 </div>

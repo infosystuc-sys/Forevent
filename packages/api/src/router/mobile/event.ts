@@ -6,6 +6,53 @@ import { dayjs } from "../../lib/utils";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { Status } from "@forevent/db";
 
+const highlightedSelect = {
+  id: true,
+  image: true,
+  createdAt: true,
+  startsAt: true,
+  endsAt: true,
+  about: true,
+  name: true,
+  location: {
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      city: true,
+      country: true,
+      iana: true,
+      image: true,
+      latitude: true,
+      longitude: true,
+      staticMap: true,
+      createdAt: true,
+    }
+  },
+  artists: {
+    select: { id: true, name: true, image: true }
+  },
+  tickets: {
+    orderBy: { price: 'asc' as const },
+    where: { discharged: true },
+    select: {
+      id: true,
+      name: true,
+      about: true,
+      price: true,
+      quantity: true,
+      validUntil: true,
+      createdAt: true,
+    }
+  },
+} as const;
+
+const highlightedBaseWhere = {
+  discharged: true,
+  private: false,
+  status: "ACCEPTED" as const,
+};
+
 export const eventRouter = createTRPCRouter({
   all: publicProcedure.query(({ ctx }) => {
     // return ctx.db.select().from(schema.post).orderBy(desc(schema.post.id));
@@ -38,55 +85,8 @@ export const eventRouter = createTRPCRouter({
 
     // Coordenadas (0, 0) significan "sin preferencia de ubicación" —
     // se envían desde el frontend cuando el usuario no otorgó permiso de ubicación.
-    // En ese caso (y como fallback), se devuelven los próximos eventos aceptados.
+    // En ese caso (y como fallback), se devuelven los eventos más recientes aceptados.
     const hasRealLocation = Math.abs(latitude) > 0.5 || Math.abs(longitude) > 0.5
-
-    const eventSelect = {
-      id: true,
-      image: true,
-      createdAt: true,
-      startsAt: true,
-      endsAt: true,
-      about: true,
-      name: true,
-      location: {
-        select: {
-          id: true,
-          name: true,
-          address: true,
-          city: true,
-          country: true,
-          iana: true,
-          image: true,
-          latitude: true,
-          longitude: true,
-          staticMap: true,
-          createdAt: true,
-        }
-      },
-      artists: {
-        select: { id: true, name: true, image: true }
-      },
-      tickets: {
-        orderBy: { price: 'asc' as const },
-        where: { discharged: true },
-        select: {
-          id: true,
-          name: true,
-          about: true,
-          price: true,
-          quantity: true,
-          validUntil: true,
-          createdAt: true,
-        }
-      },
-    }
-
-    const baseWhere = {
-      discharged: true,
-      private: false,
-      status: "ACCEPTED" as const,
-    }
 
     // Con coordenadas reales: intentar mostrar eventos cercanos primero
     if (hasRealLocation) {
@@ -94,24 +94,31 @@ export const eventRouter = createTRPCRouter({
         take: 6,
         orderBy: { startsAt: 'asc' },
         where: {
-          ...baseWhere,
+          ...highlightedBaseWhere,
           location: {
             latitude:  { lte: latitude  + 0.5, gte: latitude  - 0.5 },
             longitude: { lte: longitude + 0.5, gte: longitude - 0.5 },
           },
         },
-        select: eventSelect,
+        select: highlightedSelect,
       })
       if (nearby.length > 0) return nearby
     }
 
-    // Fallback: próximos eventos aceptados sin restricción geográfica
+    // Fallback: eventos aceptados más recientes sin restricción geográfica
     return ctx.prisma.event.findMany({
-      take: 6,
-      orderBy: { startsAt: 'asc' },
-      where: baseWhere,
-      select: eventSelect,
+      take: 12,
+      orderBy: { createdAt: 'desc' },
+      where: highlightedBaseWhere,
+      select: highlightedSelect,
     })
+  }),
+  all: publicProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.event.findMany({
+      where: highlightedBaseWhere,
+      orderBy: { createdAt: 'desc' },
+      select: highlightedSelect,
+    });
   }),
 
   trending: publicProcedure.input(z.object({
