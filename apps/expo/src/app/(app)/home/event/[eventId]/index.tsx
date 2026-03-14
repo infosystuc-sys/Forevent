@@ -1,10 +1,11 @@
 /**
  * Event Detail — Diseño premium
+ * Datos obtenidos de api.mobile.event.byId
  */
 
 import Ionicons from '@expo/vector-icons/Ionicons'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
-import { Image, ImageBackground } from 'expo-image'
+import { ImageBackground } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useLocalSearchParams } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -20,6 +21,9 @@ import {
     View,
 } from 'react-native'
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
+import Loading from '~/components/loading'
+import { api } from '~/utils/api'
+import { blurhash, dayjs, PLACEHOLDER } from '~/utils/constants'
 
 // --- Constantes de Estilo ---
 const C = {
@@ -36,50 +40,80 @@ const C = {
 const { width: W_WIDTH, height: W_HEIGHT } = Dimensions.get('window')
 const HERO_HEIGHT = W_HEIGHT * 0.48
 
-// Estilo oscuro para el mapa (JSON oficial de Google Maps Retro/Dark)
-const DARK_MAP_STYLE = [
-    { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
-    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-    { "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#212121" }] },
-    { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "color": "#757575" }] },
-    { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#181818" }] },
-    { "featureType": "road", "elementType": "geometry.fill", "stylers": [{ "color": "#2c2c2c" }] },
-    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] }
-]
+// Fallback coordenadas cuando el evento no tiene location
+const LAT_FALLBACK = -26.8167
+const LNG_FALLBACK = -65.2833
+
+// customMapStyle desactivado — en Android el estilo personalizado provocaba mapa gris.
+// El mapa por defecto de Google muestra calles y datos correctamente.
 
 export default function EventDetailScreen() {
-    const { eventId } = useLocalSearchParams()
+    const params = useLocalSearchParams<{ eventId: string }>()
+    const eventId = typeof params.eventId === 'string' ? params.eventId : params.eventId?.[0]
     const [selectedTicket, setSelectedTicket] = useState('general')
 
-    // Datos simulados (Yerba Buena, Tucumán)
-    const eventData = {
-        title: 'Neon Nights Festival 2024',
-        locationName: 'Yerba Buena, Tucumán',
-        lat: -26.8167,
-        lng: -65.2833,
-        description: 'Prepárate para la experiencia audiovisual más impactante del año. Un despliegue de luces neon, sonido inmersivo y los mejores exponentes del techno melódico en un entorno natural único.',
+    const { data: event, isLoading } = api.mobile.event.byId.useQuery(
+        { id: eventId! },
+        { enabled: !!eventId }
+    )
+
+    const rawLat = event?.location?.latitude ?? 0
+    const rawLng = event?.location?.longitude ?? 0
+    const mapLat = (rawLat === 0 && rawLng === 0) ? LAT_FALLBACK : rawLat
+    const mapLng = (rawLat === 0 && rawLng === 0) ? LNG_FALLBACK : rawLng
+    const hasValidCoords = Number.isFinite(mapLat) && Number.isFinite(mapLng)
+    const mapRenders = hasValidCoords
+
+    // Fase 2: Diagnóstico — revisar en consola Metro/Logcat
+    useEffect(() => {
+        console.log('[EventDetail] Mapa debug:', {
+            eventLocation: event?.location,
+            rawLat,
+            rawLng,
+            mapLat,
+            mapLng,
+            hasValidCoords,
+            mapRenders,
+        })
+    }, [event?.location, rawLat, rawLng, mapLat, mapLng, hasValidCoords, mapRenders])
+
+    // Deltas 0.004 = zoom detallado "calle"
+    const initialRegion = {
+        latitude: mapLat,
+        longitude: mapLng,
+        latitudeDelta: 0.004,
+        longitudeDelta: 0.004,
     }
 
-    const initialRegion = {
-        latitude: eventData.lat,
-        longitude: eventData.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-    }
+    if (isLoading || !event) return <Loading />
+
+    const startDate = dayjs.utc(event.startsAt).local()
+    const endDate = event.endsAt ? dayjs.utc(event.endsAt).local() : null
+    const dateLabel = startDate.locale('es').format('ddd, D MMM')
+    const timeLabel = `${startDate.format('HH:mm')}${endDate ? ` – ${endDate.format('HH:mm')}` : ''}`
+    const isLive = dayjs().isAfter(startDate) && (!endDate || dayjs().isBefore(endDate))
+    const locationLabel = event.location
+        ? [event.location.name, event.location.city].filter(Boolean).join(', ') || event.location.address || 'Ubicación'
+        : 'Ubicación por confirmar'
 
     const onShare = async () => {
         try {
-            await Share.share({ message: `¡Mira este evento en Forevent: ${eventData.title}!` })
+            await Share.share({ message: `¡Mira este evento en Forevent: ${event.name}!` })
         } catch (error) {
             console.log(error)
         }
     }
 
     const onOpenGoogleMaps = () => {
-        // Corrección de URL: Se elimina el "0" sobrante que causaba error en Android
-        const url = `https://www.google.com/maps/search/?api=1&query=${eventData.lat},${eventData.lng}`
+        const url = `https://www.google.com/maps/search/?api=1&query=${mapLat},${mapLng}`
         Linking.openURL(url)
+    }
+
+    const onBuyTicket = () => {
+        router.push({
+            pathname: '/(app)/home/event/[eventId]/tickets/',
+            params: { eventId: eventId! },
+        })
     }
 
     return (
@@ -90,7 +124,8 @@ export default function EventDetailScreen() {
                 {/* --- HERO SECTION --- */}
                 <View style={styles.heroContainer}>
                     <ImageBackground
-                        source={{ uri: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=2070' }}
+                        source={{ uri: event.image ?? PLACEHOLDER }}
+                        placeholder={blurhash}
                         style={styles.heroImage}
                         contentFit="cover"
                     >
@@ -112,14 +147,16 @@ export default function EventDetailScreen() {
 
                         {/* Event Basic Info Overlay */}
                         <View style={styles.heroBottomInfo}>
-                            <View style={styles.liveBadge}>
-                                <View style={styles.liveDot} />
-                                <Text style={styles.liveText}>EVENTO EN VIVO</Text>
-                            </View>
-                            <Text style={styles.eventTitle}>{eventData.title}</Text>
+                            {isLive && (
+                                <View style={styles.liveBadge}>
+                                    <View style={styles.liveDot} />
+                                    <Text style={styles.liveText}>EVENTO EN VIVO</Text>
+                                </View>
+                            )}
+                            <Text style={styles.eventTitle}>{event.name}</Text>
                             <View style={styles.row}>
                                 <Ionicons name="calendar-clear-outline" size={16} color={C.magenta} />
-                                <Text style={styles.infoText}>Vie, 25 Oct • 22:00 – 04:00</Text>
+                                <Text style={styles.infoText}>{dateLabel} • {timeLabel}</Text>
                             </View>
                         </View>
                     </ImageBackground>
@@ -127,47 +164,47 @@ export default function EventDetailScreen() {
 
                 {/* --- CONTENT --- */}
                 <View style={styles.contentPadding}>
-                    
                     {/* Sección Sobre el Evento */}
                     <Text style={styles.sectionTitle}>Sobre el Evento</Text>
-                    <Text style={styles.description}>{eventData.description}</Text>
+                    <Text style={styles.description}>{event.about || 'Sin descripción.'}</Text>
 
                     {/* Sección Ubicación con MAPA */}
                     <View style={styles.locationHeader}>
                         <Text style={styles.sectionTitle}>Ubicación</Text>
-                        <Text style={styles.locationSub}>{eventData.locationName}</Text>
+                        <Text style={styles.locationSub}>{locationLabel}</Text>
                     </View>
 
-                    <View style={styles.mapContainer}>
-                        <MapView
-                            style={styles.mapView}
-                            provider={PROVIDER_GOOGLE}
-                            initialRegion={initialRegion}
-                            scrollEnabled={false}
-                            zoomEnabled={false}
-                            rotateEnabled={false}
-                            pitchEnabled={false}
-                            customMapStyle={DARK_MAP_STYLE}
-                        >
-                            <Marker
-                                coordinate={{ latitude: eventData.lat, longitude: eventData.lng }}
-                                pinColor={C.magenta}
-                            />
-                        </MapView>
-                        
-                        {/* FAB para abrir Maps externo */}
-                        <Pressable style={styles.mapFab} onPress={onOpenGoogleMaps}>
-                            <MaterialCommunityIcons name="directions" size={24} color="#fff" />
-                            <Text style={styles.mapFabText}>Cómo llegar</Text>
-                        </Pressable>
-                    </View>
-
+                    {mapRenders && (
+                        <View style={styles.mapContainer}>
+                            <MapView
+                                style={styles.mapView}
+                                provider={PROVIDER_GOOGLE}
+                                initialRegion={initialRegion}
+                                mapPadding={{ top: 10, right: 10, bottom: 60, left: 10 }}
+                                scrollEnabled={true}
+                                zoomEnabled={true}
+                                zoomControlEnabled={true}
+                                rotateEnabled={false}
+                                pitchEnabled={false}
+                                liteMode={false}
+                            >
+                                <Marker
+                                    coordinate={{ latitude: mapLat, longitude: mapLng }}
+                                    pinColor={C.magenta}
+                                />
+                            </MapView>
+                            <Pressable style={styles.mapFab} onPress={onOpenGoogleMaps}>
+                                <MaterialCommunityIcons name="directions" size={24} color="#fff" />
+                                <Text style={styles.mapFabText}>Cómo llegar</Text>
+                            </Pressable>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 
             {/* --- FOOTER COMPRA --- */}
             <View style={styles.footer}>
-                <Pressable style={styles.btnPrimary}>
+                <Pressable style={styles.btnPrimary} onPress={onBuyTicket}>
                     <Text style={styles.btnPrimaryText}>Comprar Entrada</Text>
                     <Ionicons name="ticket-outline" size={20} color="#fff" />
                 </Pressable>
@@ -224,7 +261,8 @@ const styles = StyleSheet.create({
     locationHeader: { marginBottom: 12 },
     locationSub: { color: C.dim, fontSize: 14 },
     mapContainer: {
-        height: 200,
+        height: 300,
+        minHeight: 300,
         borderRadius: 16,
         overflow: 'hidden',
         borderWidth: 1,
@@ -234,8 +272,8 @@ const styles = StyleSheet.create({
     mapView: { ...StyleSheet.absoluteFillObject },
     mapFab: {
         position: 'absolute',
-        bottom: 12,
-        right: 12,
+        bottom: 16,
+        right: 16,
         backgroundColor: C.magenta,
         flexDirection: 'row',
         alignItems: 'center',
