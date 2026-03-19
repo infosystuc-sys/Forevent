@@ -21,7 +21,7 @@ import { router } from 'expo-router'
 import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { RouterOutputs } from '@forevent/api'
-import { ArrayElement } from 'node_modules/@forevent/api/src/root'
+import { type ArrayElement } from '@forevent/api/types'
 import { blurhash, dayjs, PLACEHOLDER } from '~/utils/constants'
 
 // ─── Brand colors ─────────────────────────────────────────────────────────────

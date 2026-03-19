@@ -178,7 +178,7 @@ export const eventRouter = createTRPCRouter({
           discharged: true,
         },
         NOT: employeesOnGates && employeesOnGates.length > 0 ? {
-          userOnGuildId: { in: employeesOnGates.map(eog => eog.userOnGuildId ?? '') },
+          userOnGuildId: { "in": employeesOnGates.map(eog => eog.userOnGuildId ?? '') },
           counterId: { not: null }
         } : undefined
       },
@@ -412,7 +412,7 @@ export const eventRouter = createTRPCRouter({
     image: z.string().url().min(2, { message: "Este campo es requerido" }),
     startsAt: z.string(),
     endsAt: z.string(),
-    private: z.boolean(),
+    "private": z.boolean(),
     location: z.object({
       name: z.string().min(2, { message: "Este campo es requerido" }),
       latitude: z.number().min(-90).max(90, { message: "Este campo es requerido" }),
@@ -479,7 +479,7 @@ export const eventRouter = createTRPCRouter({
       })
     ).optional(),
   })).mutation(async ({ ctx, input }) => {
-    const { about, endsAt, gates, image, location, name, private: priv, startsAt, tickets, artists, deposits, products, guildId } = input
+    const { about, endsAt, gates, image, location, name, "private": priv, startsAt, tickets, artists, deposits, products, guildId } = input
     return await ctx.prisma.$transaction(async (trans) => {
       const loc = await trans.location.create({
         data: location
@@ -497,7 +497,7 @@ export const eventRouter = createTRPCRouter({
           startsAt: dayjs(startsAt).$d,
           category: 'BAR',
           locationId: loc.id,
-          private: priv,
+          "private": priv,
           guildId,
           tickets: {
             createMany: {
@@ -682,7 +682,7 @@ export const eventRouter = createTRPCRouter({
     });
   }),
 
-  delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
 });

@@ -48,7 +48,7 @@ export const messageRouter = createTRPCRouter({
       return newMessage
     }),
 
-  delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
 });

@@ -1,0 +1,45 @@
+diff --git a/lib/index.mjs b/lib/index.mjs
+index b3cc764b4bb87e2a8be15d4e7cea36fd83f03d62..a2683f0cde61fa8dd6e68a1b2d2e4bbb35d0bdd8 100644
+--- a/lib/index.mjs
++++ b/lib/index.mjs
+@@ -4114,8 +4114,8 @@ class ZodPipeline extends ZodType {
+     }
+     static create(a, b) {
+         return new ZodPipeline({
+-            in: a,
+-            out: b,
++            "in": a,
++            "out": b,
+             typeName: ZodFirstPartyTypeKind.ZodPipeline,
+         });
+     }
+diff --git a/lib/index.umd.js b/lib/index.umd.js
+index 08ecb3fcbdd7a796899b926c5e7a468aa9c8d919..b35d2367a244456d9293394e9339ea8b44962ab0 100644
+--- a/lib/index.umd.js
++++ b/lib/index.umd.js
+@@ -4120,8 +4120,8 @@
+         }
+         static create(a, b) {
+             return new ZodPipeline({
+-                in: a,
+-                out: b,
++                "in": a,
++                "out": b,
+                 typeName: exports.ZodFirstPartyTypeKind.ZodPipeline,
+             });
+         }
+diff --git a/lib/types.js b/lib/types.js
+index f5ad77f952c7d718e8ab1fcb4125c33d22383b2d..c9fd323027a1f3ab0f79012ecbe69787b59ea6c7 100644
+--- a/lib/types.js
++++ b/lib/types.js
+@@ -3622,8 +3622,8 @@ class ZodPipeline extends ZodType {
+     }
+     static create(a, b) {
+         return new ZodPipeline({
+-            in: a,
+-            out: b,
++            "in": a,
++            "out": b,
+             typeName: ZodFirstPartyTypeKind.ZodPipeline,
+         });
+     }

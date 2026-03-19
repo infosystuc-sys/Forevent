@@ -23,7 +23,7 @@ export const locationRouter = createTRPCRouter({
     return
   }),
 
-  delete: protectedProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
     return await ctx.prisma.location.update({
       where: { id: input },
       data: { discharged: false }

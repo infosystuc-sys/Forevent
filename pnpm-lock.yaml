@@ -15,6 +15,9 @@ patchedDependencies:
   react-native-gesture-handler@2.14.1:
     hash: h67m5a7zkwkzalavt5whmlbwli
     path: patches/react-native-gesture-handler@2.14.1.patch
+  zod@3.24.2:
+    hash: vjzxpwkhosdol5xjjyouw2sw7a
+    path: patches/zod@3.24.2.patch
 
 importers:
 
@@ -236,7 +239,7 @@ importers:
         version: 2.2.1
       zod:
         specifier: ^3.22.4
-        version: 3.24.2
+        version: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
     devDependencies:
       '@babel/core':
         specifier: ^7.23.9
@@ -501,7 +504,7 @@ importers:
         version: 0.9.9(@types/react-dom@18.3.5)(@types/react@18.2.47)(react-dom@18.2.0)(react@18.2.0)
       zod:
         specifier: ^3.22.4
-        version: 3.24.2
+        version: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
     devDependencies:
       '@forevent/eslint-config':
         specifier: workspace:^0.2.0
@@ -583,7 +586,7 @@ importers:
         version: 2.2.1
       zod:
         specifier: ^3.22.4
-        version: 3.24.2
+        version: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
     devDependencies:
       '@forevent/eslint-config':
         specifier: workspace:^0.2.0
@@ -638,7 +641,7 @@ importers:
         version: 18.2.0(react@18.2.0)
       zod:
         specifier: ^3.22.4
-        version: 3.24.2
+        version: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
     devDependencies:
       '@forevent/eslint-config':
         specifier: workspace:^0.2.0
@@ -767,13 +770,13 @@ importers:
         version: 5.7.3
       zod:
         specifier: ^3.22.4
-        version: 3.24.2
+        version: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
 
   packages/validators:
     dependencies:
       zod:
         specifier: ^3.22.4
-        version: 3.24.2
+        version: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
     devDependencies:
       '@forevent/eslint-config':
         specifier: workspace:^0.2.0
@@ -9848,7 +9851,7 @@ packages:
         optional: true
     dependencies:
       typescript: 5.7.3
-      zod: 3.24.2
+      zod: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
     dev: false
 
   /@t3-oss/env-nextjs@0.7.3(typescript@5.7.3)(zod@3.24.2):
@@ -9862,7 +9865,7 @@ packages:
     dependencies:
       '@t3-oss/env-core': 0.7.3(typescript@5.7.3)(zod@3.24.2)
       typescript: 5.7.3
-      zod: 3.24.2
+      zod: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
     dev: false
 
   /@tanstack/query-core@5.18.0:
@@ -21148,5 +21151,6 @@ packages:
       readable-stream: 4.7.0
     dev: true
 
-  /zod@3.24.2:
+  /zod@3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a):
     resolution: {integrity: sha512-lY7CDW43ECgW9u1TcT3IoXHflywfVqDYze4waEz812jR/bZ8FHDsl7pFQoSZTz5N+2NqRXs8GBwnAwo3ZNxqhQ==}
+    patched: true

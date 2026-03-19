@@ -2,6 +2,8 @@ import { mobileRouter } from "./router/mobile";
 import { webRouter } from "./router/web";
 import { createTRPCRouter } from "./trpc";
 
+export { ArrayElement } from "./types";
+
 export const appRouter = createTRPCRouter({
   web: webRouter,
   mobile: mobileRouter
@@ -9,6 +11,3 @@ export const appRouter = createTRPCRouter({
 
 // export type definition of API
 export type AppRouter = typeof appRouter;
-
-export type ArrayElement<ArrayType extends unknown[] | null> =
-  ArrayType extends (infer ElementType)[] ? ElementType : never;

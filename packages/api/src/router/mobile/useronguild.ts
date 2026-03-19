@@ -39,7 +39,7 @@ export const userOnGuildRouter = createTRPCRouter({
     return
   }),
 
-  delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
 });

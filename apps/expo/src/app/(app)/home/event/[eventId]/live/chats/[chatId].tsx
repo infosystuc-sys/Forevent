@@ -3,7 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { Image, ImageBackground } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrayElement } from 'node_modules/@forevent/api/src/root';
+import { type ArrayElement } from '@forevent/api/types';
 import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -289,7 +289,7 @@ export const internalRouter = createTRPCRouter({
         return
     }),
 
-    delete: publicProcedure.input(z.number()).mutation(({ ctx, input }) => {
+    "delete": publicProcedure.input(z.number()).mutation(({ ctx, input }) => {
         return
     }),
 });

@@ -219,7 +219,7 @@ export const inviteRouter = createTRPCRouter({
     const transaction = await ctx.prisma.$transaction(async (trans) => {
       const gifts = await trans.gift.findMany({
         where: {
-          id: { in: giftsIds },
+          id: { "in": giftsIds },
           giftReceiverId: userId,
           discharged: true,
           status: 'PENDING'
@@ -239,7 +239,7 @@ export const inviteRouter = createTRPCRouter({
 
       await trans.gift.updateMany({
         where: {
-          id: { in: giftsIds },
+          id: { "in": giftsIds },
           giftReceiverId: userId
         },
         data: {
@@ -257,7 +257,7 @@ export const inviteRouter = createTRPCRouter({
       // Si REJECTED: limpiar giftId para que el ticket vuelva a "Mis Entradas" del sender
       if (!accept && userTicketsIds.length > 0) {
         await trans.userTicket.updateMany({
-          where: { id: { in: userTicketsIds } },
+          where: { id: { "in": userTicketsIds } },
           data: { giftId: null },
         })
       }
@@ -266,7 +266,7 @@ export const inviteRouter = createTRPCRouter({
         if (userPurchasesIds.length > 0) {
           await trans.userPurchase.updateMany({
             where: {
-              id: { in: userPurchasesIds }
+              id: { "in": userPurchasesIds }
             },
             data: {
               ownerId: userId
@@ -276,7 +276,7 @@ export const inviteRouter = createTRPCRouter({
         if (userTicketsIds.length > 0) {
           await trans.userTicket.updateMany({
             where: {
-              id: { in: userTicketsIds }
+              id: { "in": userTicketsIds }
             },
             data: {
               ownerId: userId,
@@ -331,7 +331,7 @@ export const inviteRouter = createTRPCRouter({
     return { success: true }
   }),
 
-  delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
 });

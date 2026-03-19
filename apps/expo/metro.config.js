@@ -48,6 +48,11 @@ function withMonorepoPaths(config) {
     /.*\.next\/.*/,
   ]);
 
+  config.transformer = {
+    ...config.transformer,
+    babelTransformerPath: path.resolve(__dirname, './metro.transformer.js'),
+  };
+
   return config;
 }
 

@@ -4,7 +4,7 @@ const path = require("path");
 function withMaps(config) {
   config = withSettingsGradle(config, (config) => {
     if (!config.modResults.contents.includes(":react-native-maps")) {
-      const mapsPath = path.resolve(__dirname, "../../../node_modules/react-native-maps/android");
+      const mapsPath = path.resolve(__dirname, "../../../node_modules/react-native-maps/android").replace(/\\/g, '/');
       config.modResults.contents += `\ninclude ':react-native-maps'\nproject(':react-native-maps').projectDir = new File('${mapsPath}')\n`;
     }
     return config;

@@ -306,7 +306,7 @@ export const chatRouter = createTRPCRouter({
     return chat.id
   }),
 
-  delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
 });

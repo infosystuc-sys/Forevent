@@ -49,7 +49,7 @@ const highlightedSelect = {
 
 const highlightedBaseWhere = {
   discharged: true,
-  private: false,
+  "private": false,
   status: "ACCEPTED" as const,
 };
 
@@ -165,7 +165,7 @@ export const eventRouter = createTRPCRouter({
     const data = await ctx.prisma.event.findMany({
       where: {
         discharged: true,
-        private: false,
+        "private": false,
         status: "ACCEPTED",
         // location: {
         //     AND: [
@@ -211,7 +211,7 @@ export const eventRouter = createTRPCRouter({
 
     return await ctx.prisma.event.findMany({
       where: {
-        id: { in: eventsIds }
+        id: { "in": eventsIds }
       },
       select: {
         id: true,
@@ -379,7 +379,7 @@ export const eventRouter = createTRPCRouter({
       where: {
         // ...whereData,
         status: "ACCEPTED",
-        private: false,
+        "private": false,
         discharged: true,
       },
       select: {
@@ -640,7 +640,7 @@ export const eventRouter = createTRPCRouter({
 
     const userProducts = await ctx.prisma.userPurchase.findMany({
       where: {
-        id: { in: userProductsIds }
+        id: { "in": userProductsIds }
       }
     })
 
@@ -667,7 +667,7 @@ export const eventRouter = createTRPCRouter({
 
     return await ctx.prisma.userPurchase.updateMany({
       where: {
-        id: { in: userProductsIds }
+        id: { "in": userProductsIds }
       },
       data: {
         status: 'ACCEPTED',
@@ -682,7 +682,7 @@ export const eventRouter = createTRPCRouter({
     return
   }),
 
-  delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
 });

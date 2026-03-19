@@ -76,12 +76,12 @@ export const purchaseRouter = createTRPCRouter({
         OR: [
           {
             eventTicketId: {
-              in: eventElements.tickets.map((ticket) => ticket.id)
+              "in": eventElements.tickets.map((ticket) => ticket.id)
             }
           },
           {
             productId: {
-              in: eventElements.products.map((product) => product.id)
+              "in": eventElements.products.map((product) => product.id)
             }
           }
         ]
@@ -191,7 +191,7 @@ export const purchaseRouter = createTRPCRouter({
 
     const dbDeals = await ctx.prisma.deal.findMany({
       where: {
-        id: { in: deals.map(deal => deal.dealId) }
+        id: { "in": deals.map(deal => deal.dealId) }
       },
       select: {
         id: true,
@@ -230,7 +230,7 @@ export const purchaseRouter = createTRPCRouter({
     const prodOnDeposit = await ctx.prisma.productOnDeposit.findMany({
       orderBy: { quantity: 'desc' },
       where: {
-        productId: { in: prods.map(prod => prod.productId) },
+        productId: { "in": prods.map(prod => prod.productId) },
       },
       select: {
         id: true,
@@ -340,7 +340,7 @@ export const purchaseRouter = createTRPCRouter({
     return
   }),
 
-  delete: protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
+  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
 });

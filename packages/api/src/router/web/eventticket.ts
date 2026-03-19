@@ -33,7 +33,7 @@ export const eventTicketRouter = createTRPCRouter({
 
     const eventTickets = await ctx.prisma.eventTicket.findMany({
       where: {
-        id: { in: tickets.map(ticket => ticket.ticketId) },
+        id: { "in": tickets.map(ticket => ticket.ticketId) },
       },
       include: {
         _count: {

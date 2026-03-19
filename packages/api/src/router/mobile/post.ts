@@ -77,7 +77,7 @@ export const postRouter = createTRPCRouter({
     return create
   }),
 
-  delete: protectedProcedure.input(z.object({
+  "delete": protectedProcedure.input(z.object({
     postId: z.string()
   })).mutation(async ({ ctx, input }) => {
     return await ctx.prisma.post.delete({

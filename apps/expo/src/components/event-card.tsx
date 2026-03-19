@@ -7,7 +7,7 @@ import useTheme from '~/hooks/useTheme'
 import { IANA, PLACEHOLDER, blurhash, dayjs } from '~/utils/constants'
 import { Link, router } from 'expo-router'
 import { RouterOutputs } from '@forevent/api'
-import { ArrayElement } from 'node_modules/@forevent/api/src/root'
+import { type ArrayElement } from '@forevent/api/types'
 
 const EventCard = ({ item, back, like, menu, price, showData, style }: {
     menu?: () => void,
