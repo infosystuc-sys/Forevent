@@ -101,6 +101,7 @@ const defineConfig = (): ExpoConfig => ({
     "expo-localization",
     "expo-router",
     "./expo-plugins/with-gesture-handler.js",
+    "./expo-plugins/with-maps.js",
     "./expo-plugins/with-modify-gradle.js",
   ],
 });
