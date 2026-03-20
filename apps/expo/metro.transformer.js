@@ -1,6 +1,4 @@
 const path = require('path');
-
-// Obtener el transformer que NativeWind configuró (o el de Expo por defecto)
 const upstreamTransformer = require('@expo/metro-config/build/babel-transformer');
 
 const RESERVED_WORDS = [
@@ -19,15 +17,30 @@ function fixReservedWords(src) {
   return src.replace(RESERVED_PATTERN, (match) => `"${match}"`);
 }
 
-const PROBLEMATIC_PACKAGES = [
+const SAFE_TO_TRANSFORM = [
   /@prisma/,
-  /@emotion\/is-prop-valid/,
-  /@tanstack\/query-devtools/,
-  /node_modules\/zod\//,
+  /@emotion/,
+  /@tanstack/,
+  /\/zod\//,
+  /@babel\/types/,
+];
+
+const SKIP_PACKAGES = [
+  /node_modules\/react\//,
+  /node_modules\/react-dom\//,
+  /node_modules\/react-native\//,
+  /node_modules\/@react-native/,
+  /node_modules\/expo\//,
+  /node_modules\/@expo\//,
+  /node_modules\/nativewind\//,
 ];
 
 module.exports.transform = async function(input) {
-  if (PROBLEMATIC_PACKAGES.some(re => re.test(input.filename))) {
+  const isNodeModule = input.filename.includes('node_modules');
+  const shouldSkip = SKIP_PACKAGES.some(re => re.test(input.filename));
+  const shouldTransform = SAFE_TO_TRANSFORM.some(re => re.test(input.filename));
+
+  if (isNodeModule && !shouldSkip && shouldTransform) {
     input = { ...input, src: fixReservedWords(input.src) };
   }
   return upstreamTransformer.transform(input);
