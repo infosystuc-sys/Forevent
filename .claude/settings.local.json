@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/src/app/\\(app\\)/home/\")",
+      "Bash(ls \"d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/src/app/\\(app\\)/home/event/\")",
+      "Bash(ls \"d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/src/app/\\(app\\)/home/event/[eventId]/\")"
+    ]
+  }
+}

@@ -77,6 +77,28 @@ export const eventRouter = createTRPCRouter({
     return data
   }),
 
+  nearby: publicProcedure.input(z.object({
+    latitude: z.number(),
+    longitude: z.number(),
+    radiusKm: z.number().default(8),
+  })).query(async ({ ctx, input }) => {
+    const { latitude, longitude, radiusKm } = input
+    // 1° ≈ 111 km
+    const delta = radiusKm / 111
+
+    return ctx.prisma.event.findMany({
+      orderBy: { startsAt: 'asc' },
+      where: {
+        ...highlightedBaseWhere,
+        location: {
+          latitude:  { not: null, lte: latitude  + delta, gte: latitude  - delta },
+          longitude: { not: null, lte: longitude + delta, gte: longitude - delta },
+        },
+      },
+      select: highlightedSelect,
+    })
+  }),
+
   highlighted: publicProcedure.input(z.object({
     latitude: z.number(),
     longitude: z.number(),
