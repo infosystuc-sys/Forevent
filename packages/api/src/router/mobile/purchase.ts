@@ -171,7 +171,7 @@ export const purchaseRouter = createTRPCRouter({
     let deals: {
       dealId: string,
       quantity: number
-    }[] = [] = []
+    }[] = []
 
     let total = 0
 
@@ -240,10 +240,23 @@ export const purchaseRouter = createTRPCRouter({
         product: {
           select: {
             name: true,
+            price: true,
           }
         }
       }
     })
+
+    // Add individual product prices to total
+    for (const prod of prods) {
+      const matchingDep = prodOnDeposit.find(d => d.productId === prod.productId)
+      if (matchingDep?.product.price) {
+        // Only add if this product wasn't already part of a deal
+        const isDealProduct = dbDeals.some(d => d.productOnDeal.some(p => p.productId === prod.productId))
+        if (!isDealProduct) {
+          total += matchingDep.product.price * prod.quantity
+        }
+      }
+    }
 
     let data: {
       buyerId: string,

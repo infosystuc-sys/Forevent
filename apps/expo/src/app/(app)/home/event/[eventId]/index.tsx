@@ -204,6 +204,16 @@ export default function EventDetailScreen() {
 
             {/* --- FOOTER COMPRA --- */}
             <View style={styles.footer}>
+                <Pressable
+                    style={styles.btnSecondary}
+                    onPress={() => router.push({
+                        pathname: '/(app)/home/event/[eventId]/products',
+                        params: { eventId: eventId! },
+                    })}
+                >
+                    <MaterialCommunityIcons name="food-fork-drink" size={18} color={C.magenta} />
+                    <Text style={styles.btnSecondaryText}>Ver Productos</Text>
+                </Pressable>
                 <Pressable style={styles.btnPrimary} onPress={onBuyTicket}>
                     <Text style={styles.btnPrimaryText}>Comprar Entrada</Text>
                     <Ionicons name="ticket-outline" size={20} color="#fff" />
@@ -288,13 +298,17 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 0,
         width: '100%',
-        padding: 20,
-        paddingBottom: 40,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        padding: 16,
+        paddingBottom: 36,
         backgroundColor: C.bg,
         borderTopWidth: 1,
         borderTopColor: C.border,
     },
     btnPrimary: {
+        flex: 1,
         backgroundColor: C.magenta,
         height: 55,
         borderRadius: 16,
@@ -304,4 +318,17 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    btnSecondary: {
+        height: 55,
+        borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        backgroundColor: 'rgba(255,0,255,0.10)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,0,255,0.30)',
+    },
+    btnSecondaryText: { color: C.magenta, fontSize: 14, fontWeight: '700' },
 })

@@ -39,7 +39,7 @@ import NoneTickets from '~/components/none-tickets'
 import { TicketItemCard, type TicketItem } from '~/components/TicketItemCard'
 import { useSession } from '~/context/auth'
 import { api } from '~/utils/api'
-import { blurhash, dayjs } from '~/utils/constants'
+import { blurhash, dayjs, PLACEHOLDER } from '~/utils/constants'
 
 // ─── Brand palette ─────────────────────────────────────────────────────────────
 const C = {
@@ -179,6 +179,60 @@ function SectionHeader({ title, count, accent }: { title: string; count: number;
   )
 }
 
+// ─── Purchase product card ─────────────────────────────────────────────────────
+function PurchaseProductCard({
+  product,
+  eventName,
+  eventStartsAt,
+}: {
+  product: {
+    productId: string
+    name: string
+    about: string | null
+    image: string | null
+    price: number
+    quantity: number
+    status: string
+  }
+  eventName: string
+  eventStartsAt: Date
+}) {
+  const isDelivered = product.status === 'ACCEPTED'
+  const dateLabel = dayjs(eventStartsAt).locale('es').format('D MMM')
+
+  return (
+    <View style={styles.purchaseCard}>
+      <Image
+        source={{ uri: product.image ?? PLACEHOLDER }}
+        placeholder={blurhash}
+        cachePolicy="memory-disk"
+        contentFit="cover"
+        style={styles.purchaseImg}
+      />
+      <View style={styles.purchaseInfo}>
+        <Text style={styles.purchaseName} numberOfLines={2}>{product.name}</Text>
+        {!!product.about && (
+          <Text style={styles.purchaseAbout} numberOfLines={1}>{product.about}</Text>
+        )}
+        <Text style={styles.purchasePrice}>
+          ${product.price.toFixed(2)}
+          {product.quantity > 1 && (
+            <Text style={styles.purchaseQty}>  ×{product.quantity}</Text>
+          )}
+        </Text>
+        <Text style={styles.purchaseEventLabel} numberOfLines={1}>
+          {eventName}  ·  {dateLabel}
+        </Text>
+      </View>
+      <View style={[styles.purchaseBadge, isDelivered && styles.purchaseBadgeDelivered]}>
+        <Text style={[styles.purchaseBadgeText, isDelivered && styles.purchaseBadgeTextDelivered]}>
+          {isDelivered ? 'Entregado' : 'Pendiente'}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
 // ─── Main screen ───────────────────────────────────────────────────────────────
 export default function Page() {
   const insets    = useSafeAreaInsets()
@@ -196,10 +250,17 @@ export default function Page() {
     }
   )
 
-  const isRefreshing = ticketsQuery.isFetching
+  const myPurchasesQuery = api.mobile.userPurchase.myPurchases.useQuery(
+    { userId: user!.id },
+    { staleTime: 0, refetchOnMount: 'always' },
+  )
+
+  const isRefreshing = ticketsQuery.isFetching || myPurchasesQuery.isFetching
   const onRefresh = () => {
     utils.mobile.userTicket.list.invalidate()
+    utils.mobile.userPurchase.myPurchases.invalidate()
     ticketsQuery.refetch()
+    myPurchasesQuery.refetch()
   }
 
   const allTickets = ticketsQuery.data ?? []
@@ -221,14 +282,18 @@ export default function Page() {
   const hasCarousel = carouselTickets.length > 0
   const hasGifted   = giftedTickets.length > 0
 
+  const myPurchases = myPurchasesQuery.data ?? []
+  const hasPurchases = myPurchases.length > 0
+  const purchaseTotalCount = myPurchases.reduce((sum, g) => sum + g.products.length, 0)
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offset = e.nativeEvent.contentOffset.x
     setActiveIdx(Math.round(offset / SNAP_INT))
   }
 
-  if (ticketsQuery.isLoading) return <Loading />
+  if (ticketsQuery.isLoading || myPurchasesQuery.isLoading) return <Loading />
 
-  if (!hasCarousel && !hasGifted) return <NoneTickets />
+  if (!hasCarousel && !hasGifted && !hasPurchases) return <NoneTickets />
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -369,6 +434,35 @@ export default function Page() {
             </View>
           </View>
         )}
+        {/* ══════════ SECCIÓN: Mis Compras ══════════ */}
+        <View style={[styles.section, { marginTop: (hasCarousel || hasGifted) ? 28 : 0 }]}>
+          <SectionHeader
+            title="Mis Compras"
+            count={purchaseTotalCount}
+            accent={C.magenta}
+          />
+          {hasPurchases ? (
+            <View style={styles.purchaseList}>
+              {myPurchases.map((group) =>
+                group.products.map((product) => (
+                  <PurchaseProductCard
+                    key={`${group.eventId}-${product.productId}-${product.status}`}
+                    product={product}
+                    eventName={group.eventName}
+                    eventStartsAt={group.eventStartsAt}
+                  />
+                ))
+              )}
+            </View>
+          ) : (
+            <View style={styles.purchaseEmpty}>
+              <MaterialCommunityIcons name="shopping-outline" size={40} color={C.dim} />
+              <Text style={styles.purchaseEmptyText}>
+                Aún no tenés compras de productos
+              </Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </View>
   )
@@ -684,5 +778,90 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     writingDirection: 'ltr',
+  },
+
+  // ── Purchase cards
+  purchaseList: {
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  purchaseEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 10,
+  },
+  purchaseEmptyText: {
+    color: C.dim,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  purchaseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 10,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  purchaseImg: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: C.surface,
+  },
+  purchaseInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  purchaseName: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  purchaseAbout: {
+    color: C.dim,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  purchasePrice: {
+    color: C.magenta,
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  purchaseQty: {
+    color: C.dim,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  purchaseEventLabel: {
+    color: C.dim,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  purchaseBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255,0,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,0,255,0.30)',
+    alignSelf: 'center',
+  },
+  purchaseBadgeDelivered: {
+    backgroundColor: 'rgba(0,255,157,0.10)',
+    borderColor: 'rgba(0,255,157,0.30)',
+  },
+  purchaseBadgeText: {
+    color: C.magenta,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  purchaseBadgeTextDelivered: {
+    color: '#00ff9d',
   },
 })

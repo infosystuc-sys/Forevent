@@ -316,6 +316,7 @@ export const userTicketRouter = createTRPCRouter({
           select: {
             event: {
               select: {
+                id: true,
                 location: { select: { name: true } },
                 name: true,
                 startsAt: true,
@@ -356,6 +357,7 @@ export const userTicketRouter = createTRPCRouter({
         locatioName: primaryTicket.ticket.event.location?.name ?? 'Ubicación',
         name: primaryTicket.ticket.name,
         event: {
+          id: primaryTicket.ticket.event.id,
           name: primaryTicket.ticket.event.name,
           image: primaryTicket.ticket.event.image ?? 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Placeholder_view_vector.svg/1200px-Placeholder_view_vector.svg.png',
           startsAt: primaryTicket.ticket.event.startsAt,

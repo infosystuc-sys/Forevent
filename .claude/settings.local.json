@@ -3,7 +3,34 @@
     "allow": [
       "Bash(ls \"d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/src/app/\\(app\\)/home/\")",
       "Bash(ls \"d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/src/app/\\(app\\)/home/event/\")",
-      "Bash(ls \"d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/src/app/\\(app\\)/home/event/[eventId]/\")"
+      "Bash(ls \"d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/src/app/\\(app\\)/home/event/[eventId]/\")",
+      "Bash(npx tsc:*)",
+      "Bash(grep -v \"^\\\\s*//\")",
+      "Bash(grep -v \"//.*:\")",
+      "Bash(grep -E \"^\\(parser|traverse|types|core\\)$\")",
+      "Bash(node -e \"const p = require\\(''d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/node_modules/@babel/parser''\\); const ast = p.parse\\(''const x = { for: 1, default: 2, normal: 3 }'', {sourceType:''module'', plugins:[''typescript'']}\\); console.log\\(JSON.stringify\\(ast.program.body[0].declarations[0].init.properties.map\\(p => \\({type:p.type, keyType:p.key.type, keyName:p.key.name, start:p.key.start, end:p.key.end}\\)\\)\\)\\)\")",
+      "Bash(node -e \":*)",
+      "Bash(find d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/node_modules/@tanstack/query-core/build -name *.js)",
+      "Bash(grep -v \"//.*default:\")",
+      "Bash(find d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/node_modules/@prisma/client -name *.js)",
+      "Bash(find d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo -name metro.config.*)",
+      "Bash(node -e \"var p=''D:/node_modules/zod/lib/types.js''; var r=/\\\\/zod\\\\//; console.log\\(''matches:'', r.test\\(p\\)\\)\")",
+      "Bash(find d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/node_modules/dayjs-with-plugins -name *.js)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /fi 'PID eq 29184')",
+      "Bash(findstr :808)",
+      "Bash(tasklist)",
+      "Bash(findstr -i \"node expo metro\")",
+      "Read(//dev/**)",
+      "Bash(find d:/FOREVENT2026/ForeventKonTechDev2025nicoonline -name package.json -path */nativewind/package.json)",
+      "Bash(node -e \"const s=''test''.replace\\(/\\\\\\\\/g, ''/''\\); console.log\\(s\\);\")",
+      "Bash(grep -n \"eventId\\\\|product\\\\|purchase\\\\|onEvent\\\\|cart\\\\|PRODUCTO\\\\|userId\\\\|user\\\\!\" apps/expo/src/app/\\\\\\(app\\\\\\)/home/ticket/[eventTicketId]/index.tsx)",
+      "Bash(grep -n \"CartEntry\\\\|ProductItem\\\\|type.*PRODUCT\\\\|type.*DEAL\" apps/expo/src/app/\\\\\\(app\\\\\\)/home/ticket/[eventTicketId]/index.tsx)",
+      "Bash(grep -n \"handleConfirmOrder\\\\|cartCount > 0\\\\|Confirmar pedido\\\\|cartBtn\\\\|isPending\" apps/expo/src/app/\\\\\\(app\\\\\\)/home/ticket/[eventTicketId]/index.tsx)",
+      "Bash(grep -n \"ActivityIndicator\" apps/expo/src/app/\\\\\\(app\\\\\\)/home/ticket/[eventTicketId]/index.tsx)",
+      "Bash(grep -n \"invalidate\\\\|onSuccess\\\\|purchaseMutation\\\\|utils\" apps/expo/src/app/\\\\\\(app\\\\\\)/home/ticket/[eventTicketId]/index.tsx)",
+      "Bash(grep -n \"invalidate\\\\|onSuccess\\\\|purchaseMutation\\\\|utils\" apps/expo/src/app/\\\\\\(app\\\\\\)/home/event/[eventId]/products.tsx)",
+      "Bash(grep -n \"const utils\\\\|api.useUtils\\\\|api.useContext\" apps/expo/src/app/\\\\\\(app\\\\\\)/home/ticket/[eventTicketId]/index.tsx apps/expo/src/app/\\\\\\(app\\\\\\)/home/event/[eventId]/products.tsx)"
     ]
   }
 }

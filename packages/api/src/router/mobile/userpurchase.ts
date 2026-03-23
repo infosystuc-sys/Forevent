@@ -75,6 +75,144 @@ export const userPurchaseRouter = createTRPCRouter({
     return corrected
   }),
 
+  myPurchases: publicProcedure.input(z.object({ userId: z.string() })).query(async ({ ctx, input }) => {
+    const rows = await ctx.prisma.userPurchase.findMany({
+      where: {
+        ownerId: input.userId,
+        discharged: true,
+      },
+      select: {
+        id: true,
+        status: true,
+        productOnDeposit: {
+          select: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                about: true,
+                image: true,
+                price: true,
+                event: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true,
+                    startsAt: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            name: true,
+            about: true,
+            image: true,
+            price: true,
+            event: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                startsAt: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const eventMap = new Map<string, {
+      eventId: string
+      eventName: string
+      eventImage: string
+      eventStartsAt: Date
+      products: {
+        productId: string
+        name: string
+        about: string | null
+        image: string | null
+        price: number
+        quantity: number
+        status: string
+      }[]
+    }>()
+
+    for (const row of rows) {
+      let productId: string
+      let name: string
+      let about: string | null
+      let image: string | null
+      let price: number
+      let eventId: string
+      let eventName: string
+      let eventImage: string
+      let eventStartsAt: Date
+
+      if (row.productOnDeposit?.product) {
+        const p = row.productOnDeposit.product
+        const e = p.event
+        productId = p.id
+        name = p.name
+        about = p.about
+        image = p.image
+        price = p.price
+        eventId = e.id
+        eventName = e.name
+        eventImage = e.image
+        eventStartsAt = e.startsAt
+      } else if (row.deal) {
+        const d = row.deal
+        const e = d.event
+        productId = d.id
+        name = d.name
+        about = d.about ?? null
+        image = d.image
+        price = d.price
+        eventId = e.id
+        eventName = e.name
+        eventImage = e.image
+        eventStartsAt = e.startsAt
+      } else {
+        continue
+      }
+
+      if (!eventMap.has(eventId)) {
+        eventMap.set(eventId, {
+          eventId,
+          eventName,
+          eventImage,
+          eventStartsAt,
+          products: [],
+        })
+      }
+
+      const group = eventMap.get(eventId)!
+      const existing = group.products.find(
+        (p) => p.productId === productId && p.status === String(row.status),
+      )
+      if (existing) {
+        existing.quantity++
+      } else {
+        group.products.push({
+          productId,
+          name,
+          about,
+          image,
+          price,
+          quantity: 1,
+          status: String(row.status),
+        })
+      }
+    }
+
+    return Array.from(eventMap.values())
+  }),
+
   byId: publicProcedure.input(z.object({ userPurchaseId: z.string() })).query(async ({ ctx, input }) => {
     return await ctx.prisma.userPurchase.findUnique({
       where: {

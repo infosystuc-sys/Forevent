@@ -90,7 +90,7 @@ export const productRouter = createTRPCRouter({
         if (prod.product.type === 'DRINK') {
           if (!drinks.some(drink => drink.id === prod.product.id)) {
             drinks.push({
-              id: prod.id,
+              id: prod.product.id,
               about: prod.product.about,
               image: prod.product.image,
               name: prod.product.name,
@@ -100,7 +100,7 @@ export const productRouter = createTRPCRouter({
         } else if (prod.product.type === 'FOOD') {
           if (!foods.some(food => food.id === prod.product.id)) {
             foods.push({
-              id: prod.id,
+              id: prod.product.id,
               about: prod.product.about,
               image: prod.product.image,
               name: prod.product.name,

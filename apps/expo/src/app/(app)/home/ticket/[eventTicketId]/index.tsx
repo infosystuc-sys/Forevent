@@ -5,16 +5,22 @@
  *   ┌──────────────────────────────────────┐
  *   │  [Imagen del evento — hero]          │
  *   │  ← back                             │
- *   ├──────────────────────────────────────┤  ← tarjeta con borde dentado
- *   │  Nombre · Venue · Fecha · Hora       │
- *   │  ┄┄┄┄┄┄ perforación ┄┄┄┄┄┄┄┄┄┄┄┄┄  │
- *   │        ┌──────────────┐              │
- *   │        │  QR Code     │              │
- *   │        └──────────────┘              │
- *   │   Apoya la pantalla al escáner       │
  *   ├──────────────────────────────────────┤
- *   │  [Enviar entrada]  [Info]            │
- *   │  [ENTRAR AL EVENTO]                  │
+ *   │  [ MI ENTRADA ]  [ PRODUCTOS ]       │  ← tab bar
+ *   ├──────────────────────────────────────┤
+ *   │  Tab "Mi Entrada":                   │
+ *   │    Nombre · Venue · Fecha · Hora     │
+ *   │    ┄┄┄┄ perforación ┄┄┄┄┄┄┄┄┄┄┄    │
+ *   │         ┌──────────────┐            │
+ *   │         │  QR Code     │            │
+ *   │         └──────────────┘            │
+ *   │    [Enviar entrada]  [Info]         │
+ *   │    [ENTRAR AL EVENTO]               │
+ *   ├──────────────────────────────────────┤
+ *   │  Tab "Productos":                    │
+ *   │    🍹 Tragos  🍔 Comidas  🎁 Promos │
+ *   │    [producto] [−] qty [+]           │
+ *   │  [X ítems · $TOTAL — Confirmar]     │
  *   └──────────────────────────────────────┘
  */
 
@@ -91,7 +97,7 @@ const GIFT_STATUS_LABEL: Record<string, { label: string; color: string; bg: stri
 function GiftBanner({
   status,
   isSentGift,
-  person,          // sender name if received; receiver name if sent
+  person,
   onCancel,
   isCancelling,
 }: {
@@ -119,7 +125,6 @@ function GiftBanner({
       <View style={giftStyles.accentBar} />
 
       <View style={giftStyles.content}>
-        {/* ── Título ── */}
         <View style={giftStyles.titleRow}>
           <Text style={giftStyles.icon}>🎁</Text>
           <Text style={giftStyles.title}>
@@ -127,7 +132,6 @@ function GiftBanner({
           </Text>
         </View>
 
-        {/* ── Persona del otro lado ── */}
         {person?.name && (
           <View style={giftStyles.senderRow}>
             {person.image ? (
@@ -148,7 +152,6 @@ function GiftBanner({
           </View>
         )}
 
-        {/* ── Pill de estado ── */}
         <View style={[giftStyles.statusPill, { backgroundColor: statusInfo.bg, borderColor: statusInfo.color + '66' }]}>
           <View style={[giftStyles.statusDot, { backgroundColor: statusInfo.color }]} />
           <Text style={[giftStyles.statusText, { color: statusInfo.color }]}>
@@ -156,7 +159,6 @@ function GiftBanner({
           </Text>
         </View>
 
-        {/* ── Botón anular (solo para el remitente con regalo PENDING) ── */}
         {canCancel && (
           <Pressable
             style={giftStyles.cancelBtn}
@@ -291,6 +293,171 @@ function TicketPerforation() {
   )
 }
 
+// ─── Tipos y helpers para el carrito ────────────────────────────────────────────
+type ProductType = 'PRODUCT' | 'DEAL'
+
+type CartEntry = {
+  id: string
+  name: string
+  price: number
+  quantity: number
+  type: ProductType
+}
+
+type ProductItem = {
+  id: string
+  name: string
+  image: string | null
+  price: number | null
+  about: string | null
+  type: ProductType
+}
+
+// ─── ProductSection ──────────────────────────────────────────────────────────────
+function ProductSection({
+  title,
+  items,
+  cart,
+  onIncrement,
+  onDecrement,
+}: {
+  title: string
+  items: ProductItem[]
+  cart: Record<string, CartEntry>
+  onIncrement: (p: ProductItem) => void
+  onDecrement: (id: string) => void
+}) {
+  return (
+    <View style={productStyles.section}>
+      <Text style={productStyles.sectionTitle}>{title}</Text>
+      {items.map((item) => {
+        const qty = cart[item.id]?.quantity ?? 0
+        return (
+          <View key={item.id} style={productStyles.card}>
+            <Image
+              source={{ uri: item.image ?? PLACEHOLDER }}
+              placeholder={blurhash}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              style={productStyles.cardImage}
+            />
+            <View style={productStyles.cardInfo}>
+              <Text style={productStyles.cardName} numberOfLines={2}>
+                {item.name}
+              </Text>
+              {!!item.about && (
+                <Text style={productStyles.cardAbout} numberOfLines={2}>
+                  {item.about}
+                </Text>
+              )}
+              <Text style={productStyles.cardPrice}>
+                {item.price != null ? `$${item.price.toFixed(2)}` : '—'}
+              </Text>
+            </View>
+            <View style={productStyles.qtyControl}>
+              <Pressable
+                style={[productStyles.qtyBtn, qty === 0 && productStyles.qtyBtnDisabled]}
+                onPress={() => onDecrement(item.id)}
+                disabled={qty === 0}
+              >
+                <MaterialCommunityIcons
+                  name="minus"
+                  size={15}
+                  color={qty === 0 ? 'rgba(255,255,255,0.18)' : C.white}
+                />
+              </Pressable>
+              <Text style={productStyles.qtyText}>{qty}</Text>
+              <Pressable
+                style={productStyles.qtyBtn}
+                onPress={() => onIncrement(item)}
+              >
+                <MaterialCommunityIcons name="plus" size={15} color={C.white} />
+              </Pressable>
+            </View>
+          </View>
+        )
+      })}
+    </View>
+  )
+}
+
+const productStyles = StyleSheet.create({
+  section: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    color: C.white,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 8,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  cardImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: C.surface,
+  },
+  cardInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  cardName: {
+    color: C.white,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  cardAbout: {
+    color: C.dim,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  cardPrice: {
+    color: C.magenta,
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  qtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  qtyBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  qtyText: {
+    color: C.white,
+    fontSize: 15,
+    fontWeight: '700',
+    minWidth: 18,
+    textAlign: 'center',
+  },
+})
+
 // ─── Main ───────────────────────────────────────────────────────────────────────
 export default function Page() {
   const { eventTicketId, userTicketId } = useLocalSearchParams<{ eventTicketId: string; userTicketId?: string }>()
@@ -300,6 +467,71 @@ export default function Page() {
   const [send, setSend] = useState(false)
   const utils = api.useUtils()
 
+  // ─── Tab state ────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<'ticket' | 'products'>('ticket')
+
+  // ─── Cart state ───────────────────────────────────────────────────────────────
+  const [cart, setCart] = useState<Record<string, CartEntry>>({})
+
+  const cartEntries = Object.values(cart).filter((e) => e.quantity > 0)
+  const cartCount   = cartEntries.reduce((sum, e) => sum + e.quantity, 0)
+  const cartTotal   = cartEntries.reduce((sum, e) => sum + e.price * e.quantity, 0)
+
+  function incrementCart(item: ProductItem) {
+    setCart((prev) => ({
+      ...prev,
+      [item.id]: {
+        id:       item.id,
+        name:     item.name,
+        price:    item.price ?? 0,
+        quantity: (prev[item.id]?.quantity ?? 0) + 1,
+        type:     item.type,
+      },
+    }))
+  }
+
+  function decrementCart(id: string) {
+    setCart((prev) => {
+      const current = prev[id]?.quantity ?? 0
+      if (current <= 1) {
+        const { [id]: _removed, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [id]: { ...prev[id]!, quantity: current - 1 } }
+    })
+  }
+
+  function handleConfirmOrder() {
+    const lines = cartEntries
+      .map((e) => `${e.quantity}x ${e.name}  $${(e.price * e.quantity).toFixed(2)}`)
+      .join('\n')
+    Alert.alert(
+      'Resumen del pedido',
+      `${lines}\n\nTotal: $${cartTotal.toFixed(2)}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: () => {
+            if (!eventId) {
+              Alert.alert('Error', 'No se pudo identificar el evento.')
+              return
+            }
+            purchaseMutation.mutate({
+              products: cartEntries.map((e) => ({
+                quantity: e.quantity,
+                product: { id: e.id, type: e.type },
+              })),
+              userId: user!.id,
+              eventId,
+            })
+          },
+        },
+      ]
+    )
+  }
+
+  // ─── Queries / mutations ──────────────────────────────────────────────────────
   const emailForm = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
     defaultValues: { email: '' },
@@ -313,6 +545,13 @@ export default function Page() {
   })
   const friends = api.mobile.user.friend.useQuery({ userId: user!.id })
 
+  const eventId = ticket.data?.eventTicket?.event.id
+
+  const productsQuery = api.mobile.product.onEvent.useQuery(
+    { eventId: eventId! },
+    { enabled: !!eventId && activeTab === 'products' },
+  )
+
   const enter = api.mobile.event.enter.useMutation({
     onSuccess: (res) => {
       utils.mobile.userTicket.list.invalidate()
@@ -320,6 +559,19 @@ export default function Page() {
       router.replace({ pathname: '/(app)/home/event/[eventId]/live/(tabs)/posts', params: { eventId: res.eventId } })
     },
     onError: (err) => Alert.alert('Error', err.message),
+  })
+
+  const purchaseMutation = api.mobile.purchase.products.useMutation({
+    onSuccess: () => {
+      setCart({})
+      utils.mobile.userPurchase.myPurchases.invalidate()
+      Alert.alert(
+        '¡Pedido confirmado!',
+        'Tu pedido fue registrado exitosamente. Presentá el QR en el mostrador.',
+        [{ text: 'Entendido' }],
+      )
+    },
+    onError: (err) => Alert.alert('Error en el pedido', err.message),
   })
 
   const invite = api.mobile.invite.giftCreate.useMutation({
@@ -349,7 +601,6 @@ export default function Page() {
     return () => { socket.disconnect() }
   }, [])
 
-  // Fuerza refetch al montar para evitar datos cacheados
   useEffect(() => {
     ticket.refetch()
   }, [eventTicketId])
@@ -383,7 +634,7 @@ export default function Page() {
     invite.mutate({ requesterId: user!.id, receiverEmail: data.email, userTicketsIds: [ticket.data!.url!] })
   }
 
-  // QR value — encode ticket URL + user ID
+  // ─── Derived ticket data ───────────────────────────────────────────────────
   const qrValue = ticket.data?.url
     ? JSON.stringify({ url: ticket.data.url, u: user?.id })
     : 'loading'
@@ -396,21 +647,17 @@ export default function Page() {
     : '—'
   const ticketQty = ticket.data?.quantity ?? 0
 
-  // Gift metadata
   const isGift         = ticket.data?.isGift         ?? false
   const giftStatus     = ticket.data?.giftStatus     ?? null
   const giftId         = ticket.data?.giftId         ?? null
   const isSentGift     = ticket.data?.isSentGift     ?? false
-  const isGiftBlocking = ticket.data?.isGiftBlocking ?? false   // PENDING o ACCEPTED
-  // Person on the other end: receiver if I sent, sender if I received
+  const isGiftBlocking = ticket.data?.isGiftBlocking ?? false
   const giftPerson     = isSentGift
     ? (ticket.data?.giftReceiver ?? null)
     : (ticket.data?.giftSender   ?? null)
 
-  // La entrada se puede usar sólo si hay stock Y no está bloqueada por un regalo en curso
   const canEnterRaw = (ticket.data?.quantity ?? 0) > 0
   const canEnter    = canEnterRaw && !isGiftBlocking
-  // La opción de enviar también queda deshabilitada mientras hay regalo pendiente
   const canSend     = !isGiftBlocking
 
   const handleCancelGift = () => {
@@ -429,6 +676,12 @@ export default function Page() {
     )
   }
 
+  // ─── Products data helpers ────────────────────────────────────────────────────
+  const drinks = (productsQuery.data?.drinks ?? []).map((p) => ({ ...p, type: 'PRODUCT' as const })) as ProductItem[]
+  const foods  = (productsQuery.data?.foods  ?? []).map((p) => ({ ...p, type: 'PRODUCT' as const })) as ProductItem[]
+  const deals  = (productsQuery.data?.deals  ?? []).map((p) => ({ ...p, type: 'DEAL' as const })) as ProductItem[]
+  const hasProducts = drinks.length > 0 || foods.length > 0 || deals.length > 0
+
   return (
     <SafeAreaView style={styles.root} edges={['bottom']}>
       <StatusBar style="light" animated backgroundColor="transparent" translucent />
@@ -437,7 +690,7 @@ export default function Page() {
         style={{ flex: 1 }}
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: activeTab === 'products' && cartCount > 0 ? 100 : 24 }}
       >
         {/* ════════════════ HERO IMAGE ════════════════ */}
         <View style={[styles.hero, { height: HERO_H }]}>
@@ -485,183 +738,284 @@ export default function Page() {
           </View>
         </View>
 
-        {/* ════════════════ TICKET CARD ════════════════ */}
-        <View style={styles.ticketCard}>
-
-          {/* Ticket header */}
-          <View style={styles.ticketHeader}>
-            <View>
-              <Text style={styles.ticketLabel}>TIPO DE ENTRADA</Text>
-              <Text style={styles.ticketType}>
-                {ticket.data?.eventTicket?.name ?? 'General'}
-              </Text>
-            </View>
-            <View style={styles.ticketStatusBadge}>
-              {isGiftBlocking ? (
-                <>
-                  <View style={[styles.statusDot, { backgroundColor: '#f59e0b' }]} />
-                  <Text style={[styles.ticketStatusText, { color: '#f59e0b' }]}>En regalo</Text>
-                </>
-              ) : canEnterRaw ? (
-                <>
-                  <View style={[styles.statusDot, { backgroundColor: '#22c55e' }]} />
-                  <Text style={[styles.ticketStatusText, { color: '#22c55e' }]}>Activa</Text>
-                </>
-              ) : (
-                <>
-                  <View style={[styles.statusDot, { backgroundColor: '#6b7280' }]} />
-                  <Text style={[styles.ticketStatusText, { color: '#6b7280' }]}>Usada</Text>
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* ── Perforación ── */}
-          <TicketPerforation />
-
-          {/* ── QR Code ── */}
-          <View style={styles.qrSection}>
-            {/* Halo difuminado detrás del QR */}
-            <View style={styles.qrGlow} />
-            <View style={styles.qrWrapper}>
-              {/*
-               * quietZone provee el margen blanco interno (zona silenciosa ISO 18004).
-               * Se recomienda al menos 4 módulos; usamos 16 px para garantizar
-               * escaneabilidad en modo oscuro del Pixel 6.
-               */}
-              <QRCode
-                value={qrValue}
-                size={196}
-                quietZone={16}
-                backgroundColor="#ffffff"
-                color="#180a2e"
-              />
-            </View>
-            <Text style={styles.qrHint}>
-              Presenta este código en la entrada del evento
-            </Text>
-            <Text style={styles.qrId} numberOfLines={1}>
-              #{(ticket.data?.url ?? '').slice(-12).toUpperCase()}
-            </Text>
-          </View>
-
-          {/* ── Perforación inferior ── */}
-          <TicketPerforation />
-
-          {/* ── Sección regalo ── */}
-          {isGift && (
-            <GiftBanner
-              status={giftStatus}
-              isSentGift={isSentGift}
-              person={giftPerson}
-              onCancel={handleCancelGift}
-              isCancelling={cancelGift.isPending}
+        {/* ════════════════ TAB BAR ════════════════ */}
+        <View style={styles.tabBar}>
+          <Pressable
+            style={[styles.tabBtn, activeTab === 'ticket' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('ticket')}
+          >
+            <MaterialCommunityIcons
+              name="ticket-confirmation-outline"
+              size={14}
+              color={activeTab === 'ticket' ? C.white : C.dim}
             />
-          )}
-
-          {/* ── Aviso de bloqueo ── */}
-          {isGiftBlocking && (
-            <View style={styles.giftBlockNotice}>
-              <MaterialCommunityIcons name="information-outline" size={15} color="#f59e0b" />
-              <Text style={styles.giftBlockText}>
-                Esta entrada no está disponible porque fue enviada como regalo
-              </Text>
-            </View>
-          )}
-
-          {/* ── Info rows ── */}
-          <View style={styles.infoRows}>
-            <Pressable
-              style={[styles.infoRow, isGiftBlocking && styles.infoRowDisabled]}
-              onPress={() => {
-                if (!canSend) return
-                setSend(true)
-                handleExpandPress()
-              }}
-              disabled={!canSend}
-            >
-              <MaterialCommunityIcons
-                name="send-outline"
-                size={18}
-                color={canSend ? C.magenta : C.dim}
-              />
-              <View style={styles.infoRowText}>
-                <Text style={[styles.infoRowTitle, !canSend && { color: C.dim }]}>
-                  Enviar entrada a un amigo
-                </Text>
-                <Text style={styles.infoRowSub}>
-                  {canSend
-                    ? 'Transfiere esta entrada antes de activarla'
-                    : 'No disponible mientras el regalo esté pendiente'}
-                </Text>
-              </View>
-              {canSend && <MaterialCommunityIcons name="chevron-right" size={18} color={C.dim} />}
-            </Pressable>
-
-            <View style={styles.infoRowDivider} />
-
-            <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="clock-outline" size={18} color={C.dim} />
-              <View style={styles.infoRowText}>
-                <Text style={styles.infoRowTitle}>
-                  Las puertas abren a las {startDate ? dayjs(startDate).format('HH:mm') : '—'}
-                </Text>
-                <Text style={styles.infoRowSub}>Llega con tiempo</Text>
-              </View>
-            </View>
-          </View>
+            <Text style={[styles.tabBtnText, activeTab === 'ticket' && styles.tabBtnTextActive]}>
+              MI ENTRADA
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tabBtn, activeTab === 'products' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('products')}
+          >
+            <MaterialCommunityIcons
+              name="food-fork-drink"
+              size={14}
+              color={activeTab === 'products' ? C.white : C.dim}
+            />
+            <Text style={[styles.tabBtnText, activeTab === 'products' && styles.tabBtnTextActive]}>
+              PRODUCTOS
+            </Text>
+          </Pressable>
         </View>
 
-        {/* ════════════════ ENTER BUTTON ════════════════ */}
-        <View style={styles.enterSection}>
-          <Pressable
-            style={[
-              styles.enterBtnPress,
-              (!canEnter || isGiftBlocking) && styles.enterBtnDisabled,
-            ]}
-            disabled={!canEnter || isGiftBlocking || enter.isPending}
-            onPress={() => enter.mutate({ userId: user!.id, userTicketId: ticket.data!.url! })}
-          >
-            {canEnter && !isGiftBlocking ? (
-              <LinearGradient
-                colors={['#ff00ff', '#8b00ff', '#411377']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.enterBtnGradient}
-              >
-                {enter.isPending ? (
-                  <ActivityIndicator size={20} color="#fff" />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="door-open" size={22} color="#fff" />
-                    <Text style={styles.enterBtnText}>ENTRAR AL EVENTO</Text>
-                  </>
-                )}
-              </LinearGradient>
-            ) : isGiftBlocking ? (
-              // Bloqueado porque fue enviado como regalo
-              <View style={[styles.enterBtnUsed, { opacity: 0.5 }]}>
-                <MaterialCommunityIcons name="gift-outline" size={20} color="#f59e0b" />
-                <Text style={[styles.enterBtnText, { color: '#f59e0b' }]}>ENVIADO COMO REGALO</Text>
+        {/* ════════════════ TAB: MI ENTRADA ════════════════ */}
+        {activeTab === 'ticket' && (
+          <>
+            {/* ── Ticket card ── */}
+            <View style={styles.ticketCard}>
+              <View style={styles.ticketHeader}>
+                <View>
+                  <Text style={styles.ticketLabel}>TIPO DE ENTRADA</Text>
+                  <Text style={styles.ticketType}>
+                    {ticket.data?.eventTicket?.name ?? 'General'}
+                  </Text>
+                </View>
+                <View style={styles.ticketStatusBadge}>
+                  {isGiftBlocking ? (
+                    <>
+                      <View style={[styles.statusDot, { backgroundColor: '#f59e0b' }]} />
+                      <Text style={[styles.ticketStatusText, { color: '#f59e0b' }]}>En regalo</Text>
+                    </>
+                  ) : canEnterRaw ? (
+                    <>
+                      <View style={[styles.statusDot, { backgroundColor: '#22c55e' }]} />
+                      <Text style={[styles.ticketStatusText, { color: '#22c55e' }]}>Activa</Text>
+                    </>
+                  ) : (
+                    <>
+                      <View style={[styles.statusDot, { backgroundColor: '#6b7280' }]} />
+                      <Text style={[styles.ticketStatusText, { color: '#6b7280' }]}>Usada</Text>
+                    </>
+                  )}
+                </View>
               </View>
-            ) : (
-              // Entrada ya escaneada / sin stock
-              <View style={styles.enterBtnUsed}>
-                <MaterialCommunityIcons name="check-circle-outline" size={20} color="#6b7280" />
-                <Text style={[styles.enterBtnText, { color: '#6b7280' }]}>ENTRADA UTILIZADA</Text>
+
+              <TicketPerforation />
+
+              <View style={styles.qrSection}>
+                <View style={styles.qrGlow} />
+                <View style={styles.qrWrapper}>
+                  <QRCode
+                    value={qrValue}
+                    size={196}
+                    quietZone={16}
+                    backgroundColor="#ffffff"
+                    color="#180a2e"
+                  />
+                </View>
+                <Text style={styles.qrHint}>
+                  Presenta este código en la entrada del evento
+                </Text>
+                <Text style={styles.qrId} numberOfLines={1}>
+                  #{(ticket.data?.url ?? '').slice(-12).toUpperCase()}
+                </Text>
+              </View>
+
+              <TicketPerforation />
+
+              {isGift && (
+                <GiftBanner
+                  status={giftStatus}
+                  isSentGift={isSentGift}
+                  person={giftPerson}
+                  onCancel={handleCancelGift}
+                  isCancelling={cancelGift.isPending}
+                />
+              )}
+
+              {isGiftBlocking && (
+                <View style={styles.giftBlockNotice}>
+                  <MaterialCommunityIcons name="information-outline" size={15} color="#f59e0b" />
+                  <Text style={styles.giftBlockText}>
+                    Esta entrada no está disponible porque fue enviada como regalo
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.infoRows}>
+                <Pressable
+                  style={[styles.infoRow, isGiftBlocking && styles.infoRowDisabled]}
+                  onPress={() => {
+                    if (!canSend) return
+                    setSend(true)
+                    handleExpandPress()
+                  }}
+                  disabled={!canSend}
+                >
+                  <MaterialCommunityIcons
+                    name="send-outline"
+                    size={18}
+                    color={canSend ? C.magenta : C.dim}
+                  />
+                  <View style={styles.infoRowText}>
+                    <Text style={[styles.infoRowTitle, !canSend && { color: C.dim }]}>
+                      Enviar entrada a un amigo
+                    </Text>
+                    <Text style={styles.infoRowSub}>
+                      {canSend
+                        ? 'Transfiere esta entrada antes de activarla'
+                        : 'No disponible mientras el regalo esté pendiente'}
+                    </Text>
+                  </View>
+                  {canSend && <MaterialCommunityIcons name="chevron-right" size={18} color={C.dim} />}
+                </Pressable>
+
+                <View style={styles.infoRowDivider} />
+
+                <View style={styles.infoRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={18} color={C.dim} />
+                  <View style={styles.infoRowText}>
+                    <Text style={styles.infoRowTitle}>
+                      Las puertas abren a las {startDate ? dayjs(startDate).format('HH:mm') : '—'}
+                    </Text>
+                    <Text style={styles.infoRowSub}>Llega con tiempo</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ── Enter button ── */}
+            <View style={styles.enterSection}>
+              <Pressable
+                style={[
+                  styles.enterBtnPress,
+                  (!canEnter || isGiftBlocking) && styles.enterBtnDisabled,
+                ]}
+                disabled={!canEnter || isGiftBlocking || enter.isPending}
+                onPress={() => enter.mutate({ userId: user!.id, userTicketId: ticket.data!.url! })}
+              >
+                {canEnter && !isGiftBlocking ? (
+                  <LinearGradient
+                    colors={['#ff00ff', '#8b00ff', '#411377']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.enterBtnGradient}
+                  >
+                    {enter.isPending ? (
+                      <ActivityIndicator size={20} color="#fff" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="door-open" size={22} color="#fff" />
+                        <Text style={styles.enterBtnText}>ENTRAR AL EVENTO</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                ) : isGiftBlocking ? (
+                  <View style={[styles.enterBtnUsed, { opacity: 0.5 }]}>
+                    <MaterialCommunityIcons name="gift-outline" size={20} color="#f59e0b" />
+                    <Text style={[styles.enterBtnText, { color: '#f59e0b' }]}>ENVIADO COMO REGALO</Text>
+                  </View>
+                ) : (
+                  <View style={styles.enterBtnUsed}>
+                    <MaterialCommunityIcons name="check-circle-outline" size={20} color="#6b7280" />
+                    <Text style={[styles.enterBtnText, { color: '#6b7280' }]}>ENTRADA UTILIZADA</Text>
+                  </View>
+                )}
+              </Pressable>
+
+              <Text style={styles.enterHint}>
+                {isGiftBlocking
+                  ? 'Anulá el regalo para recuperar el acceso a esta entrada'
+                  : canEnter
+                    ? 'El QR se activa automáticamente al presentarlo'
+                    : 'Esta entrada ya fue escaneada en el ingreso'}
+              </Text>
+            </View>
+          </>
+        )}
+
+        {/* ════════════════ TAB: PRODUCTOS ════════════════ */}
+        {activeTab === 'products' && (
+          <View style={styles.productsContainer}>
+            {productsQuery.isLoading && (
+              <View style={styles.productsLoading}>
+                <ActivityIndicator color={C.magenta} size="large" />
+                <Text style={styles.productsLoadingText}>Cargando productos...</Text>
               </View>
             )}
-          </Pressable>
 
-          <Text style={styles.enterHint}>
-            {isGiftBlocking
-              ? 'Anulá el regalo para recuperar el acceso a esta entrada'
-              : canEnter
-                ? 'El QR se activa automáticamente al presentarlo'
-                : 'Esta entrada ya fue escaneada en el ingreso'}
-          </Text>
-        </View>
+            {!productsQuery.isLoading && !hasProducts && (
+              <View style={styles.emptyProducts}>
+                <MaterialCommunityIcons name="food-off-outline" size={52} color={C.dim} />
+                <Text style={styles.emptyProductsTitle}>Sin productos disponibles</Text>
+                <Text style={styles.emptyProductsSub}>
+                  Este evento no tiene productos disponibles por el momento.
+                </Text>
+              </View>
+            )}
+
+            {!productsQuery.isLoading && hasProducts && (
+              <>
+                {drinks.length > 0 && (
+                  <ProductSection
+                    title="🍹  Tragos"
+                    items={drinks}
+                    cart={cart}
+                    onIncrement={incrementCart}
+                    onDecrement={decrementCart}
+                  />
+                )}
+                {foods.length > 0 && (
+                  <ProductSection
+                    title="🍔  Comidas"
+                    items={foods}
+                    cart={cart}
+                    onIncrement={incrementCart}
+                    onDecrement={decrementCart}
+                  />
+                )}
+                {deals.length > 0 && (
+                  <ProductSection
+                    title="🎁  Promociones"
+                    items={deals}
+                    cart={cart}
+                    onIncrement={incrementCart}
+                    onDecrement={decrementCart}
+                  />
+                )}
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
+
+      {/* ════════════════ CART FOOTER ════════════════ */}
+      {activeTab === 'products' && cartCount > 0 && (
+        <View style={styles.cartFooter}>
+          <View style={styles.cartFooterInfo}>
+            <Text style={styles.cartFooterCount}>
+              {cartCount} {cartCount === 1 ? 'ítem' : 'ítems'}
+            </Text>
+            <Text style={styles.cartFooterTotal}>${cartTotal.toFixed(2)}</Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.cartFooterBtn,
+              pressed && { opacity: 0.8 },
+              purchaseMutation.isPending && { opacity: 0.6 },
+            ]}
+            onPress={handleConfirmOrder}
+            disabled={purchaseMutation.isPending}
+          >
+            {purchaseMutation.isPending ? (
+              <ActivityIndicator size={18} color={C.white} />
+            ) : (
+              <MaterialCommunityIcons name="check-circle-outline" size={18} color={C.white} />
+            )}
+            <Text style={styles.cartFooterBtnText}>Confirmar pedido</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* ════════════════ BOTTOM SHEET — Enviar entrada ════════════════ */}
       <BottomSheet
@@ -788,6 +1142,41 @@ const styles = StyleSheet.create({
   heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   heroMeta: { color: C.dim, fontSize: 12 },
 
+  // ── Tab bar
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
+    borderRadius: 11,
+  },
+  tabBtnActive: {
+    backgroundColor: C.magenta,
+  },
+  tabBtnText: {
+    color: C.dim,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  tabBtnTextActive: {
+    color: C.white,
+  },
+
   // ── Ticket card
   ticketCard: {
     marginHorizontal: 16,
@@ -849,7 +1238,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,0,255,0.07)',
   },
   qrWrapper: {
-    // Padding blanco generoso: garantiza zona silenciosa extra ante escaners exigentes
     padding: 20,
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -911,7 +1299,6 @@ const styles = StyleSheet.create({
   enterBtnPress: {
     borderRadius: 50,
     overflow: 'hidden',
-    // Glow exterior — sólo visible cuando está activo
     shadowColor: C.magenta,
     shadowOpacity: 0.55,
     shadowRadius: 18,
@@ -947,6 +1334,86 @@ const styles = StyleSheet.create({
   },
   enterHint: { color: C.dim, fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
+  // ── Products tab
+  productsContainer: {
+    paddingTop: 4,
+    minHeight: 200,
+  },
+  productsLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 12,
+  },
+  productsLoadingText: {
+    color: C.dim,
+    fontSize: 13,
+  },
+  emptyProducts: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  emptyProductsTitle: {
+    color: C.white,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyProductsSub: {
+    color: C.dim,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+
+  // ── Cart footer
+  cartFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: C.surface,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    gap: 12,
+  },
+  cartFooterInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  cartFooterCount: {
+    color: C.dim,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  cartFooterTotal: {
+    color: C.white,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  cartFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: C.magenta,
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    shadowColor: C.magenta,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  cartFooterBtnText: {
+    color: C.white,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
   // ── Bottom Sheet
   bsTitle: { color: C.white, fontSize: 22, fontWeight: '700', marginBottom: 4 },
   bsSub: { color: C.dim, fontSize: 13, marginBottom: 16 },
@@ -963,4 +1430,3 @@ const styles = StyleSheet.create({
   },
   bsBtnText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
 })
-
