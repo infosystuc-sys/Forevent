@@ -59,7 +59,7 @@ export default function Page() {
                     console.log('refresh!');
                     users.refetch()
                 }} />}
-                estimatedItemSize={20}
+                estimatedItemSize={80}
                 showsVerticalScrollIndicator={false}
                 showsHorizontalScrollIndicator={false}
                 ListEmptyComponent={() => (

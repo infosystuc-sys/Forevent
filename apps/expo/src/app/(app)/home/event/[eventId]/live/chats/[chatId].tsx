@@ -125,7 +125,7 @@ export default function Page() {
                             <View style={{ flex: 1, flexDirection: "row", gap: 10 }}>
                                 <FlashList
                                     ref={flatlistRef}
-                                    estimatedItemSize={20}
+                                    estimatedItemSize={70}
                                     inverted
                                     onEndReachedThreshold={0.4}
                                     contentContainerStyle={{ paddingHorizontal: 10 }}

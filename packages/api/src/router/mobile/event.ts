@@ -1,10 +1,8 @@
-import { CreatePostSchema } from "@forevent/validators";
 import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
 import { dayjs } from "../../lib/utils";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
-import { Status } from "@forevent/db";
 
 const highlightedSelect = {
   id: true,
@@ -54,11 +52,6 @@ const highlightedBaseWhere = {
 };
 
 export const eventRouter = createTRPCRouter({
-  all: publicProcedure.query(({ ctx }) => {
-    // return ctx.db.select().from(schema.post).orderBy(desc(schema.post.id));
-    return
-  }),
-
   users: publicProcedure.input(z.object({
     eventId: z.string(),
   })).query(async ({ ctx, input }) => {
@@ -385,7 +378,7 @@ export const eventRouter = createTRPCRouter({
           gte: ((longitude - 0.2) + 180) * -1,
         }
       }
-      if (longitude = -179.8) {
+      if (longitude === -179.8) {
         a = { longitude: 180 }
       }
       longitudeConditional['OR'] = [{

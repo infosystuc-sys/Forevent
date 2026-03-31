@@ -99,10 +99,17 @@ const defineConfig = (): ExpoConfig => ({
       }
     ],
     "expo-localization",
+    [
+      "expo-location",
+      {
+        "locationWhenInUsePermission": "Forevent necesita tu ubicación para mostrar eventos cercanos."
+      }
+    ],
     "expo-router",
     "./expo-plugins/with-gesture-handler.js",
     "./expo-plugins/with-maps.js",
     "./expo-plugins/with-modify-gradle.js",
+    "./expo-plugins/with-metro-port.js",
   ],
 });
 

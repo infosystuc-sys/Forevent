@@ -109,7 +109,7 @@ const Page: React.FC = () => {
             storeObject("user", res.user)
             storeString("session", res.sessionId)
             signIn(res)
-            router.replace("/(app)/home/(tabs)")
+            router.replace("/(app)")
         },
         onError: (error) => {
             if (error.data?.code === 'CONFLICT') {
@@ -219,7 +219,7 @@ const Page: React.FC = () => {
     // If the user is already authenticated, skip the login screen entirely.
     useEffect(() => {
         if (user) {
-            router.replace("/(app)/home/(tabs)")
+            router.replace("/(app)")
         }
     }, [user])
 

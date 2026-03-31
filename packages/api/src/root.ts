@@ -2,7 +2,7 @@ import { mobileRouter } from "./router/mobile";
 import { webRouter } from "./router/web";
 import { createTRPCRouter } from "./trpc";
 
-export { ArrayElement } from "./types";
+export type { ArrayElement } from "./types";
 
 export const appRouter = createTRPCRouter({
   web: webRouter,

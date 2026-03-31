@@ -1,4 +1,4 @@
-import Geolocation from '@react-native-community/geolocation'
+import * as Location from 'expo-location'
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { useFocusEffect, router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -10,8 +10,6 @@ import {
     AppStateStatus,
     Image,
     Linking,
-    PermissionsAndroid,
-    Platform,
     Pressable,
     StyleSheet,
     Text,
@@ -33,9 +31,6 @@ type CardEvent = {
 
 const DEFAULT_COORDS = { latitude: -26.8100, longitude: -65.2958 }
 
-const FINE   = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-const COARSE = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
-
 function formatEventDate(date: Date | string): string {
     const d = typeof date === 'string' ? new Date(date) : date
     return d.toLocaleDateString('es-AR', {
@@ -45,23 +40,6 @@ function formatEventDate(date: Date | string): string {
         hour: '2-digit',
         minute: '2-digit',
     })
-}
-
-async function androidHasLocation(): Promise<boolean> {
-    const fine = await PermissionsAndroid.check(FINE)
-    if (fine) return true
-    return PermissionsAndroid.check(COARSE)
-}
-
-async function androidRequestLocation(): Promise<boolean> {
-    const result = await PermissionsAndroid.request(FINE, {
-        title: 'Permiso de ubicación',
-        message: 'Forevent necesita tu ubicación para mostrar eventos cercanos.',
-        buttonPositive: 'Aceptar',
-        buttonNegative: 'Cancelar',
-    })
-    if (result === PermissionsAndroid.RESULTS.GRANTED) return true
-    return PermissionsAndroid.check(COARSE)
 }
 
 export default function ExplorePage() {
@@ -110,7 +88,7 @@ export default function ExplorePage() {
         }).start(() => setSelectedEvent(null))
     }
 
-    function fetchLocation() {
+    async function fetchLocation() {
         clearFallbackTimer()
 
         fallbackTimerRef.current = setTimeout(() => {
@@ -121,55 +99,45 @@ export default function ExplorePage() {
             setPermState('granted')
         }, 10000)
 
-        Geolocation.getCurrentPosition(
-            (pos) => {
-                clearFallbackTimer()
-                setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-                setUsingFallback(false)
-                setPermState('granted')
-            },
-            (err) => {
-                clearFallbackTimer()
-                console.log('[Explore] Geolocation error:', err.code, err.message)
-                if (err.code === 1) {
-                    setPermState('denied')
-                } else {
-                    setCoords(DEFAULT_COORDS)
-                    setUsingFallback(true)
-                    setPermState('granted')
-                }
-            },
-            { enableHighAccuracy: false, timeout: 30000, maximumAge: 60000 },
-        )
+        try {
+            const pos = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            })
+            clearFallbackTimer()
+            setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+            setUsingFallback(false)
+            setPermState('granted')
+        } catch (err) {
+            clearFallbackTimer()
+            console.log('[Explore] Location error:', err)
+            setCoords(DEFAULT_COORDS)
+            setUsingFallback(true)
+            setPermState('granted')
+        }
     }
 
     async function silentCheckAndLocate() {
         if (permissionRef.current === 'granted') return
-        if (Platform.OS === 'android') {
-            const has = await androidHasLocation()
-            if (!has) return
-        }
-        fetchLocation()
+        const { status } = await Location.getForegroundPermissionsAsync()
+        if (status !== 'granted') return
+        void fetchLocation()
     }
 
     async function verifyAndLocate() {
-        if (Platform.OS === 'android') {
-            const alreadyGranted = await androidHasLocation()
-            if (alreadyGranted) {
-                if (!coords) setPermState('asking')
-                fetchLocation()
-                return
-            }
-            setPermState('asking')
-            const granted = await androidRequestLocation()
-            if (!granted) {
-                setPermState('denied')
-                return
-            }
-        } else {
-            Geolocation.requestAuthorization()
+        const { status: existing } = await Location.getForegroundPermissionsAsync()
+        if (existing === 'granted') {
+            if (!coords) setPermState('asking')
+            void fetchLocation()
+            return
         }
-        fetchLocation()
+
+        setPermState('asking')
+        const { status } = await Location.requestForegroundPermissionsAsync()
+        if (status !== 'granted') {
+            setPermState('denied')
+            return
+        }
+        void fetchLocation()
     }
 
     useFocusEffect(
@@ -191,10 +159,20 @@ export default function ExplorePage() {
         }, []),
     )
 
-    const { data: events = [] } = api.mobile.event.nearby.useQuery(
-        { latitude: coords?.latitude ?? 0, longitude: coords?.longitude ?? 0, radiusKm: 8 },
+    const nearbyQuery = api.mobile.event.nearby.useQuery(
+        { latitude: coords?.latitude ?? 0, longitude: coords?.longitude ?? 0, radiusKm: 50 },
         { enabled: !!coords },
     )
+
+    // Fallback: si nearby devuelve vacío, usar highlighted que tiene fallback global
+    const highlightedQuery = api.mobile.event.highlighted.useQuery(
+        { latitude: coords?.latitude ?? 0, longitude: coords?.longitude ?? 0 },
+        { enabled: !!coords && nearbyQuery.isSuccess && (nearbyQuery.data?.length ?? 0) === 0 },
+    )
+
+    const events = (nearbyQuery.data?.length ?? 0) > 0
+        ? nearbyQuery.data ?? []
+        : highlightedQuery.data ?? []
 
     // --- Loading ---
     if (permission === 'asking') {

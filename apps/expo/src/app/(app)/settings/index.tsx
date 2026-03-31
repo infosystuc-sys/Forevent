@@ -71,7 +71,7 @@ export default function Page() {
     }
 
     return (
-        <SafeAreaView>
+        <SafeAreaView style={{ flex: 1 }}>
             <Pressable
                 style={{ padding: 20, borderRadius: 50, alignItems: 'center', flexDirection: 'row' }}
                 onPress={() => { if (router.canGoBack()) router.back() }}
@@ -81,10 +81,10 @@ export default function Page() {
                     Configuración
                 </Text>
             </Pressable>
-            <View className='h-full w-full px-5'>
+            <View style={{ flex: 1, paddingHorizontal: 20 }}>
                 <FlashList
                     data={items}
-                    estimatedItemSize={20}
+                    estimatedItemSize={50}
                     showsVerticalScrollIndicator={false}
                     showsHorizontalScrollIndicator={false}
                     overScrollMode='never'

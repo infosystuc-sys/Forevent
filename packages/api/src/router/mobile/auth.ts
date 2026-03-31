@@ -287,6 +287,66 @@ export const authRouter = createTRPCRouter({
     return challenge.id
   }),
 
+  // ─── Employee status check ─────────────────────────────────────────────────
+  checkEmployeeStatus: publicProcedure.input(z.object({
+    userId: z.string(),
+  })).query(async ({ ctx, input }) => {
+    const { userId } = input;
+
+    const assignments = await ctx.prisma.userOnGuild.findMany({
+      where: {
+        userId,
+        role: "EMPLOYEE",
+        status: "ACCEPTED",
+        discharged: true,
+        employeeOnEvent: {
+          some: {
+            discharged: true,
+            event: {
+              discharged: true,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        role: true,
+        guild: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+        employeeOnEvent: {
+          where: {
+            discharged: true,
+            event: { discharged: true },
+          },
+          select: {
+            id: true,
+            event: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                startsAt: true,
+                endsAt: true,
+              },
+            },
+            counter: { select: { id: true, name: true } },
+            gate: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      isEmployee: assignments.length > 0,
+      assignments,
+    };
+  }),
+
   // ─── Password-based auth ────────────────────────────────────────────────────
 
   registerWithPassword: publicProcedure.input(z.object({

@@ -39,7 +39,7 @@ export default function Page() {
             <FlashList
                 // data={posts?.data?.pages.flatMap(page => page.finalData)}
                 data={posts.data}
-                estimatedItemSize={20}
+                estimatedItemSize={400}
                 refreshControl={<RefreshControl tintColor={colors.text} progressBackgroundColor={colors.text} refreshing={posts.isFetching} onRefresh={() => {
                     console.log('refresh!');
                     posts.refetch()

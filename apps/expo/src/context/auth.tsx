@@ -3,6 +3,8 @@ import { removeStoreData } from '~/lib/storage';
 import { useStorageState } from '~/hooks/useStorageState';
 import { sharedQueryClient } from '~/utils/api';
 
+export type ActiveRole = 'USER' | 'EMPLOYEE';
+
 interface SignInPayload {
     user: AuthenticatedUser
     sessionId: string;
@@ -22,8 +24,10 @@ interface Session {
     signIn: (props: SignInPayload) => void;
     signOut: () => void;
     session?: string | null;
-    isLoading: boolean,
-    user: AuthenticatedUser | null
+    isLoading: boolean;
+    user: AuthenticatedUser | null;
+    activeRole: ActiveRole;
+    setActiveRole: (role: ActiveRole) => void;
 }
 
 const AuthContext = React.createContext<Session>({
@@ -31,7 +35,9 @@ const AuthContext = React.createContext<Session>({
     signOut: () => null,
     isLoading: false,
     user: null,
-    session: null
+    session: null,
+    activeRole: 'USER',
+    setActiveRole: () => null,
 });
 
 // This hook can be used to access the user info.
@@ -49,6 +55,7 @@ export function useSession() {
 export function SessionProvider(props: React.PropsWithChildren) {
     const [[isLoading, session], setSession] = useStorageState('session');
     const [user, setUser] = useState<AuthenticatedUser | null>(null)
+    const [activeRole, setActiveRole] = useState<ActiveRole>('USER')
 
     return (
         <AuthContext.Provider value={{
@@ -59,6 +66,7 @@ export function SessionProvider(props: React.PropsWithChildren) {
             signOut: () => {
                 setUser(null);
                 setSession(null);
+                setActiveRole('USER');
                 // Limpiar AsyncStorage para que cold-start no restaure la sesión anterior
                 void removeStoreData('session');
                 void removeStoreData('user');
@@ -69,6 +77,8 @@ export function SessionProvider(props: React.PropsWithChildren) {
             session,
             user,
             isLoading,
+            activeRole,
+            setActiveRole,
         }}>
             {props.children}
         </AuthContext.Provider>

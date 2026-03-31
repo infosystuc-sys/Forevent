@@ -1,98 +1,79 @@
-/**
- * metro.transformer.js — Custom Metro transformer para Hermes
- *
- * Problema: Hermes (el motor JS de React Native) no acepta palabras
- * reservadas de JavaScript como claves de objeto sin comillas:
- *   { default: 1, async: 2 }   ← Hermes falla
- *   { "default": 1, "async": 2 } ← OK
- *
- * Archivos afectados (node_modules):
- *   - zod/lib/types.js          → 4 ocurrencias de `async:`
- *   - dayjs/locale/*.js         → 1 ocurrencia de `default:` por archivo (144 archivos)
- *   - dayjs-with-plugins/...    → 142 ocurrencias de `default:`
- *   - @babel/types/lib/index.js → 1 ocurrencia de `is:`
- *
- * Solución: AST parsing con @babel/parser + @babel/traverse.
- *   - Visita SOLO ObjectProperty/ObjectMethod con key Identifier reservada.
- *   - Reemplazo quirúrgico por posición AST (nunca toca strings ni comentarios).
- *   - Guard de posición: verifica que el slice coincide con el nombre esperado
- *     antes de aplicar el reemplazo (protege contra posiciones erróneas de
- *     errorRecovery).
- */
-
+// metro.transformer.js — Fix reserved-word object keys/methods for Hermes
+//
+// Hermes rejects unquoted reserved words as:
+//   - Object property keys:  { default: 1 }       -> { "default": 1 }
+//   - Object method names:   { default() {} }      -> { "default"() {} }
+//
+// Uses @babel/parser AST for precise detection. Runs BEFORE babel-preset-expo.
+// Targets: node_modules .js/.mjs/.cjs files AND .prisma/client files.
 const path   = require('path');
 const crypto = require('crypto');
 const upstreamTransformer = require('@expo/metro-config/build/babel-transformer');
 
-// ─── Babel AST tools (root del monorepo) ──────────────────────────────────────
 const MONOREPO_ROOT = path.join(__dirname, '..', '..');
 
-let babelParser   = null;
-let babelTraverse = null;
-
+let babelParser, babelTraverse;
 try {
     babelParser   = require(path.join(MONOREPO_ROOT, 'node_modules/@babel/parser'));
     babelTraverse = require(path.join(MONOREPO_ROOT, 'node_modules/@babel/traverse')).default;
 } catch (e) {
-    console.warn('[metro.transformer] @babel/parser o @babel/traverse no disponibles:', e.message);
+    console.warn('[transformer] babel not available:', e.message);
 }
 
-// ─── Palabras reservadas que Hermes rechaza como keys sin comillas ─────────────
-const RESERVED_SET = new Set([
+const RESERVED = new Set([
     'delete', 'private', 'public', 'protected', 'static',
     'in', 'of', 'new', 'typeof', 'void', 'class', 'extends',
     'implements', 'interface', 'enum', 'abstract', 'default',
     'is', 'for', 'async', 'await', 'super', 'with', 'debugger',
 ]);
 
-/**
- * Reemplaza claves de objeto reservadas usando posiciones exactas del AST.
- *
- * @param {string} src      - source JS original
- * @param {string} filename - ruta del archivo
- * @returns {string}        - source corregido
- */
+// Pre-check: match reserved words followed by ":" (property) or "(" (method)
+// This avoids parsing files that can't possibly have the issue.
+const QUICK_CHECK = /\b(async|default|in|delete|private|public|for|of|new|class|typeof|void|is|await|super|static|enum|extends|implements|interface|abstract|with|debugger|protected)\s*[:(]/;
+
 function fixReservedWords(src, filename) {
     if (!babelParser || !babelTraverse) return src;
 
-    // Solo archivos .js (todos los node_modules afectados son .js)
+    // Only process JS files (node_modules are always .js/.mjs/.cjs)
     const ext = path.extname(filename || '').toLowerCase();
     if (ext !== '.js' && ext !== '.mjs' && ext !== '.cjs') return src;
 
+    // Quick pre-check: skip files without any potential match
+    if (!QUICK_CHECK.test(src)) return src;
+
     let ast;
     try {
+        // Parse as plain JS — do NOT use TypeScript plugin for node_modules .js files.
+        // Using 'typescript' plugin on .js files misparses comparisons like `a<b, c>(d)`.
+        // IMPORTANT: errorRecovery is OFF — files that fail to parse (Flow, etc.)
+        // are skipped safely. The postinstall patch already handles them on disk.
         ast = babelParser.parse(src, {
-            sourceType: 'module',
+            sourceType: 'unambiguous',
             plugins: [],
-            errorRecovery: true,
         });
     } catch (e) {
         return src;
     }
 
     const replacements = [];
-
     try {
         babelTraverse(ast, {
-            ObjectProperty(nodePath) {
-                const { key, computed } = nodePath.node;
-                if (
-                    !computed &&
-                    key.type === 'Identifier' &&
-                    typeof key.start === 'number' &&
-                    RESERVED_SET.has(key.name)
-                ) {
+            // { default: value, private: value }
+            ObjectProperty(np) {
+                const node = np.node;
+                const { key, computed } = node;
+                // Skip shorthand { async } — quoting would produce invalid { "async" }
+                if (node.shorthand) return;
+                if (!computed && key.type === 'Identifier' &&
+                    typeof key.start === 'number' && RESERVED.has(key.name)) {
                     replacements.push({ start: key.start, end: key.end, name: key.name });
                 }
             },
-            ObjectMethod(nodePath) {
-                const { key, computed } = nodePath.node;
-                if (
-                    !computed &&
-                    key.type === 'Identifier' &&
-                    typeof key.start === 'number' &&
-                    RESERVED_SET.has(key.name)
-                ) {
+            // { default() {}, delete() {} }
+            ObjectMethod(np) {
+                const { key, computed } = np.node;
+                if (!computed && key.type === 'Identifier' &&
+                    typeof key.start === 'number' && RESERVED.has(key.name)) {
                     replacements.push({ start: key.start, end: key.end, name: key.name });
                 }
             },
@@ -103,95 +84,67 @@ function fixReservedWords(src, filename) {
 
     if (replacements.length === 0) return src;
 
-    // Ordenar de mayor a menor para que cada reemplazo no desplace los anteriores.
+    // Sort end-to-start so replacements don't shift positions
     replacements.sort((a, b) => b.start - a.start);
 
     const seen = new Set();
     let result = src;
-    let applied = 0;
-    let skipped = 0;
 
     for (const { start, end, name } of replacements) {
-        const dedupeKey = `${start}:${end}`;
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
+        const id = start + ':' + end;
+        if (seen.has(id)) continue;
+        seen.add(id);
 
-        // Guard: verificar que la posición AST apunta exactamente al identificador.
-        // errorRecovery puede producir posiciones incorrectas; si el slice no
-        // coincide, saltar en lugar de corromper el source.
+        // Safety: verify the source at this position matches the identifier
         const actual = result.slice(start, end);
-        if (actual !== name) {
-            console.warn(
-                `[transformer] SKIP bad AST pos ${start}:${end} ` +
-                `expected ${JSON.stringify(name)} found ${JSON.stringify(actual.slice(0, 30))} ` +
-                `ctx: ${JSON.stringify(result.slice(Math.max(0, start - 20), end + 20))}`
-            );
-            skipped++;
-            continue;
-        }
+        if (actual !== name) continue;
 
-        result = result.slice(0, start) + JSON.stringify(name) + result.slice(end);
-        applied++;
-    }
+        // Context validation: the char after the identifier must be ":" or "("
+        // (property key or method name). This prevents corrupting if/for/while conditions.
+        const charAfter = result[end];
+        if (charAfter !== ':' && charAfter !== '(') continue;
 
-    if (skipped > 0) {
-        console.warn(`[transformer] ${filename}: applied ${applied}, SKIPPED ${skipped} bad positions`);
+        result = result.slice(0, start) + '"' + name + '"' + result.slice(end);
     }
 
     return result;
 }
 
-// ─── Paquetes de node_modules que SÍ deben transformarse ──────────────────────
-// Solo los que tienen palabras reservadas como object property keys sin comillas.
-// El filename ya está normalizado a forward-slash antes de testear estos regex.
-const PACKAGES_TO_FIX = [
-    /\/zod\//,            // zod/lib/types.js: 4× `async:`
-    /\/dayjs\//,          // dayjs/locale/*.js: 1× `default:` cada uno (144 archivos)
-    /dayjs-with-plugins/, // dist bundle: 142× `default:`
-    /@babel\/types/,      // @babel/types/lib/index.js: 1× `is:`
-    /@prisma/,            // precaución (puede tener reserved words)
-    /@emotion/,           // precaución (puede tener reserved words)
-];
-
-// ─── Transform principal ───────────────────────────────────────────────────────
-const _logged = new Set();
+// Track which files have been logged to avoid flooding the console
+const _loggedFiles = new Set();
 
 module.exports.transform = async function (input) {
-    // Normalizar separadores a forward-slash (Windows usa backslash).
-    const normFilename = input.filename.replace(/\\/g, '/');
+    // Normalize path separators (Windows backslash → forward slash)
+    const norm = input.filename.replace(/\\/g, '/');
 
-    const isNodeModule = normFilename.includes('node_modules');
-    const shouldFix    = isNodeModule && PACKAGES_TO_FIX.some((re) => re.test(normFilename));
+    // Transform node_modules AND .prisma/client JS files
+    // .prisma is a hidden dir inside node_modules that scanners often skip
+    const isNodeModule = norm.includes('node_modules') || norm.includes('.prisma');
+    const isJsFile = /\.(js|mjs|cjs)$/.test(norm);
 
-    if (shouldFix) {
-        const srcBefore = input.src;
-        const srcAfter  = fixReservedWords(srcBefore, input.filename);
+    if (isNodeModule && isJsFile) {
+        const before = input.src;
+        const after  = fixReservedWords(before, input.filename);
 
-        if (srcBefore !== srcAfter) {
-            if (!_logged.has(input.filename)) {
-                _logged.add(input.filename);
-                console.log(`[transformer] ✏️  MODIFIED ${input.filename}`);
+        if (before !== after) {
+            if (!_loggedFiles.has(norm)) {
+                _loggedFiles.add(norm);
+                console.log('[transformer] FIXED ' + path.basename(norm));
             }
-            input = { ...input, src: srcAfter };
-        } else if (!_logged.has(input.filename)) {
-            _logged.add(input.filename);
-            console.log(`[transformer]    unchanged ${input.filename}`);
+            input = { ...input, src: after };
         }
     }
 
     return upstreamTransformer.transform(input);
 };
 
-// ─── Cache key ─────────────────────────────────────────────────────────────────
-const TRANSFORMER_HASH = crypto
+// Cache key: hash the entire transformer file so any change invalidates cache
+const _hash = crypto
     .createHash('md5')
     .update(require('fs').readFileSync(__filename))
     .digest('hex');
 
-const _upstreamCacheKey =
-    typeof upstreamTransformer.getCacheKey === 'function'
-        ? upstreamTransformer.getCacheKey()
-        : '';
+const _upstream = typeof upstreamTransformer.getCacheKey === 'function'
+    ? upstreamTransformer.getCacheKey() : '';
 
-module.exports.getCacheKey = () =>
-    `${_upstreamCacheKey}-fixReserved-${TRANSFORMER_HASH}`;
+module.exports.getCacheKey = () => _upstream + '-hermesFix-' + _hash;

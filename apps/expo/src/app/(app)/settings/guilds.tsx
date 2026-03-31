@@ -53,7 +53,7 @@ export default function Page() {
             <FlashList
                 data={invites.data}
                 scrollEnabled={true}
-                estimatedItemSize={1000}
+                estimatedItemSize={150}
                 ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
                 keyExtractor={(item, index) => index.toString()}
                 showsVerticalScrollIndicator={false}

@@ -72,7 +72,7 @@ export default function Page() {
           </View>
           <FlashList
             data={categorizedEvents.data}
-            estimatedItemSize={20}
+            estimatedItemSize={150}
             ItemSeparatorComponent={() => <View style={{ height: 25 }} />}
             ListHeaderComponent={() => <View style={{ height: 25 }} />}
             showsVerticalScrollIndicator={false}

@@ -132,6 +132,7 @@ export const userPurchaseRouter = createTRPCRouter({
       eventImage: string
       eventStartsAt: Date
       products: {
+        userPurchaseIds: string[]
         productId: string
         name: string
         about: string | null
@@ -197,8 +198,10 @@ export const userPurchaseRouter = createTRPCRouter({
       )
       if (existing) {
         existing.quantity++
+        existing.userPurchaseIds.push(row.id)
       } else {
         group.products.push({
+          userPurchaseIds: [row.id],
           productId,
           name,
           about,
@@ -214,12 +217,74 @@ export const userPurchaseRouter = createTRPCRouter({
   }),
 
   byId: publicProcedure.input(z.object({ userPurchaseId: z.string() })).query(async ({ ctx, input }) => {
-    return await ctx.prisma.userPurchase.findUnique({
+    const purchase = await ctx.prisma.userPurchase.findUnique({
       where: {
         id: input.userPurchaseId,
         discharged: true,
-      }
+      },
+      select: {
+        id: true,
+        status: true,
+        ownerId: true,
+        buyerId: true,
+        createdAt: true,
+        productOnDeposit: {
+          select: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                about: true,
+                image: true,
+                price: true,
+                event: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true,
+                    startsAt: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            name: true,
+            about: true,
+            image: true,
+            price: true,
+            event: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+                startsAt: true,
+              },
+            },
+          },
+        },
+        gifts: {
+          where: { discharged: true, status: { "in": ['PENDING', 'ACCEPTED'] } },
+          select: {
+            id: true,
+            status: true,
+            giftReceiver: { select: { id: true, name: true, image: true } },
+          },
+        },
+      },
     })
+
+    if (!purchase) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Compra no encontrada',
+      })
+    }
+
+    return purchase
   }),
 
   qrInfo: publicProcedure.input(z.object({ userPurchaseId: z.string() })).query(async ({ ctx, input }) => {

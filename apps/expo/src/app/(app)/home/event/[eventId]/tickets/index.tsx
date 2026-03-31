@@ -198,7 +198,7 @@ export default function Index() {
                 ItemSeparatorComponent={() => <View className='h-4' />}
                 keyExtractor={(item, index) => index.toString()}
                 showsVerticalScrollIndicator={false}
-                estimatedItemSize={20}
+                estimatedItemSize={120}
                 showsHorizontalScrollIndicator={false}
                 overScrollMode='never'
                 contentContainerStyle={{ paddingHorizontal: 15 }}

@@ -109,3 +109,45 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
     },
   });
 });
+
+/**
+ * Employee procedure
+ *
+ * Verifies the user is authenticated AND has an active employee assignment
+ * (UserOnGuild with role EMPLOYEE + at least one active EmployeeOnEvent).
+ * Injects the employee's `userOnGuildId` into context for downstream use.
+ */
+export const employeeProcedure = t.procedure.use(async ({ ctx, next }) => {
+  if (!ctx.session?.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const employee = await ctx.prisma.userOnGuild.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      role: "EMPLOYEE",
+      status: "ACCEPTED",
+      discharged: true,
+      employeeOnEvent: {
+        some: {
+          discharged: true,
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!employee) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No tienes permisos de empleado para esta acción.",
+    });
+  }
+
+  return next({
+    ctx: {
+      session: { ...ctx.session, user: ctx.session.user },
+      employeeId: employee.id,
+    },
+  });
+});

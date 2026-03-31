@@ -102,9 +102,6 @@ importers:
       '@react-native-async-storage/async-storage':
         specifier: 1.21.0
         version: 1.21.0(react-native@0.73.6)
-      '@react-native-community/geolocation':
-        specifier: ^3.1.0
-        version: 3.4.0(react-native@0.73.6)(react@18.2.0)
       '@shopify/flash-list':
         specifier: 1.6.3
         version: 1.6.3(@babel/runtime@7.26.9)(react-native@0.73.6)(react@18.2.0)
@@ -159,6 +156,9 @@ importers:
       expo-localization:
         specifier: ~14.8.3
         version: 14.8.4(expo@50.0.21)
+      expo-location:
+        specifier: ~16.5.5
+        version: 16.5.5(expo@50.0.21)
       expo-media-library:
         specifier: ~15.9.1
         version: 15.9.2(expo@50.0.21)
@@ -8289,17 +8289,6 @@ packages:
       - utf-8-validate
     dev: false
 
-  /@react-native-community/geolocation@3.4.0(react-native@0.73.6)(react@18.2.0):
-    resolution: {integrity: sha512-bzZH89/cwmpkPMKKveoC72C4JH0yF4St5Ceg/ZM9pA1SqX9MlRIrIrrOGZ/+yi++xAvFDiYfihtn9TvXWU9/rA==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      react: '*'
-      react-native: '*'
-    dependencies:
-      react: 18.2.0
-      react-native: 0.73.6(@babel/core@7.26.9)(@babel/preset-env@7.26.9)(react@18.2.0)
-    dev: false
-
   /@react-native/assets-registry@0.73.1:
     resolution: {integrity: sha512-2FgAbU7uKM5SbbW9QptPPZx8N9Ke2L7bsHb+EhAanZjFZunA9PaYtyjUQ1s7HD+zDVqOQIvjkpXSv7Kejd2tqg==}
     engines: {node: '>=18'}
@@ -13447,6 +13436,14 @@ packages:
     dependencies:
       expo: 50.0.21(@babel/core@7.26.9)(@react-native/babel-preset@0.84.1)(react-native@0.73.6)(react@18.2.0)
       rtl-detect: 1.1.2
+    dev: false
+
+  /expo-location@16.5.5(expo@50.0.21):
+    resolution: {integrity: sha512-dXEd1HaZgdi6yHVF8R+SMnGlKDYrD+Hkkzd/b9edjMSUBLxF2y824AFSSNUf6BVOM53tJBOFEELneXkU1uj9nA==}
+    peerDependencies:
+      expo: '*'
+    dependencies:
+      expo: 50.0.21(@babel/core@7.26.9)(@react-native/babel-preset@0.84.1)(react-native@0.73.6)(react@18.2.0)
     dev: false
 
   /expo-media-library@15.9.2(expo@50.0.21):

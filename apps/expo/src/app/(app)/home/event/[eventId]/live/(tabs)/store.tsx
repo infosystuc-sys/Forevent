@@ -6,12 +6,11 @@ import BottomSheet, {
   BottomSheetView
 } from '@gorhom/bottom-sheet';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { FlashList } from '@shopify/flash-list';
 import { Image, ImageBackground } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Controller, SubmitHandler, useForm } from 'react-hook-form';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { RefreshControl } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
@@ -161,7 +160,7 @@ export default function Page() {
         </View>
       </View >
       <View style={{ height: 10 }} />
-      <View className='flex-1 px-5'>
+      <View style={{ flex: 1, paddingHorizontal: 20 }}>
         <Controller
           control={addForm.control}
           name="product"
@@ -169,37 +168,31 @@ export default function Page() {
             field: { onChange, onBlur, value },
             fieldState: { error },
           }) => {
+            const deals = store.data?.deals ?? [];
+            const foods = store.data?.foods ?? [];
+            const drinks = store.data?.drinks ?? [];
             return (
-              <View className='flex flex-1'>
-                <FlashList
-                  data={store.data?.deals}
-                  keyExtractor={(item, index) => index.toString()}
-                  estimatedItemSize={20}
-                  ItemSeparatorComponent={() => <View style={{ height: .5, backgroundColor: colors.outline, marginVertical: 20 }} />}
-                  ListHeaderComponent={<Text numberOfLines={2} style={{ textTransform: "uppercase", fontWeight: "800", fontSize: 22, lineHeight: 50, letterSpacing: -1, color: colors.text }}>
-                    Promociones
-                  </Text>}
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                  refreshControl={<RefreshControl tintColor={colors.text} progressBackgroundColor={colors.text} refreshing={store.isFetching} onRefresh={() => {
-                    console.log('refresh!');
-                    store.refetch()
-                  }} />}
-                  ListEmptyComponent={() =>
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                      <Text style={{ color: colors.text }}>
-                        No hay promociones disponibles
-                      </Text>
-                    </View>
-                  }
-                  overScrollMode='never'
-                  scrollEnabled={false}
-                  ListFooterComponent={() => <View style={{ height: 0 }} />}
-                  renderItem={({ item, index }) =>
-                    <View style={{ flex: 1, backgroundColor: colors.inverseText }}>
+              <ScrollView
+                style={{ flex: 1 }}
+                showsVerticalScrollIndicator={false}
+                overScrollMode='never'
+                refreshControl={<RefreshControl tintColor={colors.text} progressBackgroundColor={colors.text} refreshing={store.isFetching} onRefresh={() => store.refetch()} />}
+              >
+                {/* Promociones */}
+                <Text numberOfLines={2} style={{ textTransform: "uppercase", fontWeight: "800", fontSize: 22, lineHeight: 50, letterSpacing: -1, color: colors.text }}>
+                  Promociones
+                </Text>
+                {deals.length === 0 ? (
+                  <View style={{ paddingVertical: 20, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: colors.text }}>No hay promociones disponibles</Text>
+                  </View>
+                ) : deals.map((item, index) => (
+                  <View key={item.id ?? index}>
+                    {index > 0 && <View style={{ height: .5, backgroundColor: colors.outline, marginVertical: 20 }} />}
+                    <View style={{ backgroundColor: colors.inverseText }}>
                       <Pressable style={{ borderRadius: 15 }} onPress={() => { onChange({ id: item.id, name: item.name, price: item.price, about: item.about, image: item.image, type: 'DEAL' }); setStep(1), handleExpandPress() }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <View style={{ gap: 10, justifyContent: 'space-between' }}>
+                          <View style={{ gap: 10, justifyContent: 'space-between', flex: 1 }}>
                             <View>
                               <Text style={{ fontWeight: "600", fontSize: 20, letterSpacing: .5, color: colors.text, textAlign: 'left' }}>
                                 {item.name}
@@ -216,84 +209,61 @@ export default function Page() {
                         </View>
                       </Pressable>
                     </View>
-                  }
-                />
-                <FlashList
-                  data={store.data?.foods}
-                  keyExtractor={(item, index) => index.toString()}
-                  estimatedItemSize={20}
-                  ItemSeparatorComponent={() => <View style={{ height: .5, backgroundColor: colors.outline, marginVertical: 20 }} />}
-                  ListHeaderComponent={<Text numberOfLines={2} style={{ textTransform: "uppercase", fontWeight: "800", fontSize: 22, lineHeight: 50, letterSpacing: -1, color: colors.text }}>
-                    Comida
-                  </Text>}
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                  refreshControl={<RefreshControl tintColor={colors.text} progressBackgroundColor={colors.text} refreshing={store.isFetching} onRefresh={() => {
-                    console.log('refresh!');
-                    store.refetch()
-                  }} />}
-                  ListEmptyComponent={() =>
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                      <Text style={{ color: colors.text }}>
-                        No hay comida disponibles
-                      </Text>
-                    </View>
-                  }
-                  overScrollMode='never'
-                  scrollEnabled={false}
-                  ListFooterComponent={() => <View style={{ height: 10 }} />}
-                  renderItem={({ item, index }) =>
-                    <View style={{ flex: 1, backgroundColor: colors.inverseText }}>
-                      <Pressable style={{ borderRadius: 15 }} onPress={() => { onChange({ id: item.id, name: item.name, price: item.price, about: item.about, image: item.image, type: 'PRODUCT' }); setStep(1), handleExpandPress() }}>
+                  </View>
+                ))}
+
+                {/* Comida */}
+                <Text numberOfLines={2} style={{ textTransform: "uppercase", fontWeight: "800", fontSize: 22, lineHeight: 50, letterSpacing: -1, color: colors.text }}>
+                  Comida
+                </Text>
+                {foods.length === 0 ? (
+                  <View style={{ paddingVertical: 20, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: colors.text }}>No hay comida disponible</Text>
+                  </View>
+                ) : foods.map((item, index) => (
+                  <View key={item.id ?? index}>
+                    {index > 0 && <View style={{ height: .5, backgroundColor: colors.outline, marginVertical: 20 }} />}
+                    <View style={{ backgroundColor: colors.inverseText, opacity: 0.5 }}>
+                      <View style={{ borderRadius: 15 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <View style={{ gap: 10, justifyContent: 'space-between' }}>
+                          <View style={{ gap: 10, justifyContent: 'space-between', flex: 1 }}>
                             <View>
                               <Text style={{ fontWeight: "600", fontSize: 20, letterSpacing: .5, color: colors.text, textAlign: 'left' }}>
                                 {item.name}
                               </Text>
-                              <Text style={{ fontSize: 16, letterSpacing: .5, color: colors.text, textAlign: 'left' }} >
+                              <Text style={{ fontSize: 16, letterSpacing: .5, color: colors.text, textAlign: 'left' }}>
                                 {item.about}
                               </Text>
                             </View>
-                            <Text style={{ color: "yellow", fontSize: 20, letterSpacing: .5, textAlign: 'left', fontWeight: '600' }} >
+                            <Text style={{ color: "grey", fontSize: 20, letterSpacing: .5, textAlign: 'left', fontWeight: '600' }}>
                               $ {item.price?.toLocaleString()}
                             </Text>
                           </View>
                           <Image cachePolicy='memory-disk' placeholder={blurhash} priority='high' style={{ borderRadius: 5, backgroundColor: colors.onBackground, width: '30%', aspectRatio: 1 }} source={{ uri: item.image ?? PLACEHOLDER }} />
                         </View>
-                      </Pressable>
+                        <View style={{ marginTop: 8, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start' }}>
+                          <Text style={{ color: '#999', fontSize: 12, fontWeight: '600' }}>No disponible para compra online</Text>
+                        </View>
+                      </View>
                     </View>
-                  }
-                />
-                <FlashList
-                  data={store.data?.drinks}
-                  keyExtractor={(item, index) => index.toString()}
-                  estimatedItemSize={20}
-                  ItemSeparatorComponent={() => <View style={{ height: .5, backgroundColor: colors.outline, marginVertical: 20 }} />}
-                  ListHeaderComponent={<Text numberOfLines={2} style={{ textTransform: "uppercase", fontWeight: "800", fontSize: 22, lineHeight: 50, letterSpacing: -1, color: colors.text }}>
-                    Bebidas
-                  </Text>}
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                  refreshControl={<RefreshControl tintColor={colors.text} progressBackgroundColor={colors.text} refreshing={store.isFetching} onRefresh={() => {
-                    console.log('refresh!');
-                    store.refetch()
-                  }} />}
-                  ListEmptyComponent={() =>
-                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                      <Text style={{ color: colors.text }}>
-                        No hay bebidas disponibles
-                      </Text>
-                    </View>
-                  }
-                  overScrollMode='never'
-                  scrollEnabled={false}
-                  ListFooterComponent={() => <View style={{ height: 50 }} />}
-                  renderItem={({ item, index }) =>
-                    <View style={{ flex: 1, backgroundColor: colors.inverseText }}>
+                  </View>
+                ))}
+
+                {/* Bebidas */}
+                <Text numberOfLines={2} style={{ textTransform: "uppercase", fontWeight: "800", fontSize: 22, lineHeight: 50, letterSpacing: -1, color: colors.text }}>
+                  Bebidas
+                </Text>
+                {drinks.length === 0 ? (
+                  <View style={{ paddingVertical: 20, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: colors.text }}>No hay bebidas disponibles</Text>
+                  </View>
+                ) : drinks.map((item, index) => (
+                  <View key={item.id ?? index}>
+                    {index > 0 && <View style={{ height: .5, backgroundColor: colors.outline, marginVertical: 20 }} />}
+                    <View style={{ backgroundColor: colors.inverseText }}>
                       <Pressable style={{ borderRadius: 15 }} onPress={() => { onChange({ id: item.id, name: item.name, price: item.price, about: item.about, image: item.image, type: 'PRODUCT' }); setStep(1), handleExpandPress() }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <View style={{ gap: 10, justifyContent: 'space-between' }}>
+                          <View style={{ gap: 10, justifyContent: 'space-between', flex: 1 }}>
                             <View>
                               <Text style={{ fontWeight: "600", fontSize: 20, letterSpacing: .5, color: colors.text, textAlign: 'left' }}>
                                 {item.name}
@@ -310,9 +280,10 @@ export default function Page() {
                         </View>
                       </Pressable>
                     </View>
-                  }
-                />
-              </View>
+                  </View>
+                ))}
+                <View style={{ height: 50 }} />
+              </ScrollView>
             );
           }}
         />

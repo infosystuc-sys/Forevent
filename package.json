@@ -31,7 +31,7 @@
     "lint": "turbo lint --continue -- --cache --cache-location='node_modules/.cache/.eslintcache'",
     "lint:fix": "turbo lint --continue -- --fix --cache --cache-location='node_modules/.cache/.eslintcache'",
     "lint:ws": "pnpm dlx sherif@latest",
-    "postinstall": "pnpm lint:ws",
+    "postinstall": "node scripts/postinstall.js",
     "typecheck": "turbo typecheck",
     "kill": "taskkill /f /im node.exe",
     "start:all": "pnpm kill && turbo dev --parallel"

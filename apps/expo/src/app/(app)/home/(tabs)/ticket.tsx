@@ -5,13 +5,18 @@
  *   ┌──────────────────────────────────────┐
  *   │  Header: "MIS ENTRADAS"              │
  *   ├──────────────────────────────────────┤
- *   │  ── Mis Entradas ──────────────────  │
- *   │  [carousel horizontal, snap]         │
- *   │    card: imagen · nombre · badge qty │
- *   │  ● ○ ○  (pager dots)                │
+ *   │  [ ENTRADAS ]  [ PRODUCTOS ]         │  ← pill tab bar
  *   ├──────────────────────────────────────┤
- *   │  ── Regalos en Curso ─────────────   │
- *   │    [compact amber card x N]         │
+ *   │  Tab "Entradas":                     │
+ *   │    [carousel horizontal, snap]       │
+ *   │    card: imagen · nombre · badge qty │
+ *   │    ● ○ ○  (pager dots)              │
+ *   │    ── Regalos en Curso ────────      │
+ *   │    [compact amber card x N]          │
+ *   ├──────────────────────────────────────┤
+ *   │  Tab "Productos":                    │
+ *   │    [purchase card list]              │
+ *   │    producto · precio · evento · badge│
  *   └──────────────────────────────────────┘
  */
 
@@ -20,7 +25,7 @@ import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import {
   Dimensions,
   FlatList,
@@ -35,7 +40,6 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Loading from '~/components/loading'
-import NoneTickets from '~/components/none-tickets'
 import { TicketItemCard, type TicketItem } from '~/components/TicketItemCard'
 import { useSession } from '~/context/auth'
 import { api } from '~/utils/api'
@@ -186,6 +190,7 @@ function PurchaseProductCard({
   eventStartsAt,
 }: {
   product: {
+    userPurchaseIds: string[]
     productId: string
     name: string
     about: string | null
@@ -201,7 +206,22 @@ function PurchaseProductCard({
   const dateLabel = dayjs(eventStartsAt).locale('es').format('D MMM')
 
   return (
-    <View style={styles.purchaseCard}>
+    <Pressable
+      style={styles.purchaseCard}
+      onPress={() => {
+        if (product.userPurchaseIds.length === 1) {
+          router.push({
+            pathname: '/(app)/home/ticket/purchase/[userPurchaseId]/',
+            params: { userPurchaseId: product.userPurchaseIds[0] },
+          })
+        } else {
+          router.push({
+            pathname: '/(app)/home/ticket/purchase/list',
+            params: { ids: JSON.stringify(product.userPurchaseIds), productName: product.name },
+          })
+        }
+      }}
+    >
       <Image
         source={{ uri: product.image ?? PLACEHOLDER }}
         placeholder={blurhash}
@@ -229,7 +249,9 @@ function PurchaseProductCard({
           {isDelivered ? 'Entregado' : 'Pendiente'}
         </Text>
       </View>
-    </View>
+
+      <MaterialCommunityIcons name="chevron-right" size={20} color={C.dim} style={{ alignSelf: 'center' }} />
+    </Pressable>
   )
 }
 
@@ -238,6 +260,7 @@ export default function Page() {
   const insets    = useSafeAreaInsets()
   const { user }  = useSession()
   const [activeIdx, setActiveIdx] = useState(0)
+  const [activeTab, setActiveTab] = useState<'entradas' | 'productos'>('entradas')
 
   const utils = api.useUtils()
   const ticketsQuery = api.mobile.userTicket.list.useQuery(
@@ -293,8 +316,6 @@ export default function Page() {
 
   if (ticketsQuery.isLoading || myPurchasesQuery.isLoading) return <Loading />
 
-  if (!hasCarousel && !hasGifted && !hasPurchases) return <NoneTickets />
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar style="light" animated backgroundColor="transparent" translucent />
@@ -325,60 +346,135 @@ export default function Page() {
           )}
         </View>
 
-        {/* ══════════ SECCIÓN: Mis Entradas (propios + recibidos como regalo) ══════════ */}
-        {hasCarousel && (
-          <View style={styles.section}>
-            <SectionHeader title="Mis Entradas" count={carouselTickets.length} />
-
-            {/* Contador independiente: Entrada X de X */}
-            <Text style={styles.entradaCounter}>
-              Entrada {activeIdx + 1} de {carouselTickets.length}
+        {/* ── Tab bar ── */}
+        <View style={styles.tabBar}>
+          <Pressable
+            style={[styles.tabBtn, activeTab === 'entradas' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('entradas')}
+          >
+            <MaterialCommunityIcons
+              name="ticket-confirmation-outline"
+              size={16}
+              color={activeTab === 'entradas' ? C.white : C.dim}
+            />
+            <Text style={[styles.tabBtnText, activeTab === 'entradas' && styles.tabBtnTextActive]}>
+              ENTRADAS
             </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tabBtn, activeTab === 'productos' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('productos')}
+          >
+            <MaterialCommunityIcons
+              name="shopping-outline"
+              size={16}
+              color={activeTab === 'productos' ? C.white : C.dim}
+            />
+            <Text style={[styles.tabBtnText, activeTab === 'productos' && styles.tabBtnTextActive]}>
+              PRODUCTOS
+            </Text>
+            {purchaseTotalCount > 0 && (
+              <View style={styles.tabBadge}>
+                <Text style={styles.tabBadgeText}>{purchaseTotalCount}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
 
-            {/* Carrusel: tickets propios + regalos pendientes/aceptados */}
-            <FlatList
-              data={carouselTickets}
-              horizontal
-              keyExtractor={(item) => {
-                const i = item as TicketItem & { id?: string }
-                return i.id ?? i.userTicketId ?? i.url ?? i.eventTicket.id
-              }}
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={SNAP_INT}
-              decelerationRate="fast"
-              contentContainerStyle={styles.carouselContent}
-              ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              renderItem={({ item }) => {
-                const raw = item as TicketItem & {
-                  isSentGift?: boolean
-                  isIncomingGift?: boolean
-                  giftSenderName?: string | null
-                  giftSenderImage?: string | null
-                }
-                const ticket: TicketItem = {
-                  id: raw.id ?? raw.userTicketId ?? raw.url,
-                  userTicketId: raw.userTicketId ?? raw.url,
-                  url: raw.url,
-                  quantity: raw.quantity,
-                  eventTicket: raw.eventTicket,
-                  giftId: raw.giftId ?? null,
-                  isSentGift:      raw.isSentGift      ?? false,
-                  isIncomingGift:  raw.isIncomingGift  ?? false,
-                  giftSenderName:  raw.giftSenderName  ?? null,
-                  giftSenderImage: raw.giftSenderImage ?? null,
-                }
-                return (
-                  <TicketItemCard
-                    ticket={ticket}
-                    cardWidth={CARD_W}
-                    styles={styles}
-                    onPress={() => {
-                      if (ticket.isIncomingGift) {
-                        // Regalo pendiente: lleva a la pantalla de regalos para aceptar
-                        router.push('/(app)/home/gift')
-                      } else {
+        {/* ══════════ TAB: ENTRADAS ══════════ */}
+        {activeTab === 'entradas' && (
+          <>
+            {hasCarousel && (
+              <View style={styles.section}>
+                <SectionHeader title="Mis Entradas" count={carouselTickets.length} />
+
+                <Text style={styles.entradaCounter}>
+                  Entrada {activeIdx + 1} de {carouselTickets.length}
+                </Text>
+
+                <FlatList
+                  data={carouselTickets}
+                  horizontal
+                  keyExtractor={(item) => {
+                    const i = item as TicketItem & { id?: string }
+                    return i.id ?? i.userTicketId ?? i.url ?? i.eventTicket.id
+                  }}
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={SNAP_INT}
+                  decelerationRate="fast"
+                  contentContainerStyle={styles.carouselContent}
+                  ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
+                  renderItem={({ item }) => {
+                    const raw = item as TicketItem & {
+                      isSentGift?: boolean
+                      isIncomingGift?: boolean
+                      giftSenderName?: string | null
+                      giftSenderImage?: string | null
+                    }
+                    const ticket: TicketItem = {
+                      id: raw.id ?? raw.userTicketId ?? raw.url,
+                      userTicketId: raw.userTicketId ?? raw.url,
+                      url: raw.url,
+                      quantity: raw.quantity,
+                      eventTicket: raw.eventTicket,
+                      giftId: raw.giftId ?? null,
+                      isSentGift:      raw.isSentGift      ?? false,
+                      isIncomingGift:  raw.isIncomingGift  ?? false,
+                      giftSenderName:  raw.giftSenderName  ?? null,
+                      giftSenderImage: raw.giftSenderImage ?? null,
+                    }
+                    return (
+                      <TicketItemCard
+                        ticket={ticket}
+                        cardWidth={CARD_W}
+                        styles={styles}
+                        onPress={() => {
+                          if (ticket.isIncomingGift) {
+                            router.push('/(app)/home/gift')
+                          } else {
+                            router.push({
+                              pathname: '/(app)/home/ticket/[eventTicketId]/',
+                              params: {
+                                eventTicketId: item.eventTicket.id,
+                                userTicketId: item.id ?? item.userTicketId,
+                              },
+                            })
+                          }
+                        }}
+                      />
+                    )
+                  }}
+                />
+
+                <PagerDots total={carouselTickets.length} active={activeIdx} />
+              </View>
+            )}
+
+            {hasGifted && (
+              <View style={[styles.section, { marginTop: hasCarousel ? 28 : 0 }]}>
+                <SectionHeader
+                  title="Regalos en Curso"
+                  count={giftedTickets.length}
+                  accent={C.amber}
+                />
+                <Text style={styles.giftSectionSub}>
+                  Estos tickets están pendientes de aceptación. Podés anular el envío desde el detalle.
+                </Text>
+
+                <View style={styles.giftList}>
+                  {giftedTickets.map((item, i) => (
+                    <SentGiftCard
+                      key={item.id ?? i}
+                      item={{
+                        userTicketId: item.userTicketId ?? item.id,
+                        giftId: item.giftId ?? null,
+                        giftStatus: item.gift?.status ?? null,
+                        giftReceiver: item.gift?.giftReceiver ?? null,
+                        eventTicket: item.eventTicket,
+                      }}
+                      onPress={() =>
                         router.push({
                           pathname: '/(app)/home/ticket/[eventTicketId]/',
                           params: {
@@ -387,82 +483,49 @@ export default function Page() {
                           },
                         })
                       }
-                    }}
-                  />
-                )
-              }}
-            />
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
 
-            <PagerDots total={carouselTickets.length} active={activeIdx} />
-          </View>
+            {!hasCarousel && !hasGifted && (
+              <View style={styles.purchaseEmpty}>
+                <MaterialCommunityIcons name="ticket-outline" size={40} color={C.dim} />
+                <Text style={styles.purchaseEmptyText}>
+                  Aún no tenés entradas
+                </Text>
+              </View>
+            )}
+          </>
         )}
 
-        {/* ══════════ SECCIÓN: Regalos en Curso ══════════ */}
-        {hasGifted && (
-          <View style={[styles.section, { marginTop: hasCarousel ? 28 : 0 }]}>
-            <SectionHeader
-              title="Regalos en Curso"
-              count={giftedTickets.length}
-              accent={C.amber}
-            />
-            <Text style={styles.giftSectionSub}>
-              Estos tickets están pendientes de aceptación. Podés anular el envío desde el detalle.
-            </Text>
-
-            <View style={styles.giftList}>
-              {giftedTickets.map((item, i) => (
-                <SentGiftCard
-                  key={item.id ?? i}
-                  item={{
-                    userTicketId: item.userTicketId ?? item.id,
-                    giftId: item.giftId ?? null,
-                    giftStatus: item.gift?.status ?? null,
-                    giftReceiver: item.gift?.giftReceiver ?? null,
-                    eventTicket: item.eventTicket,
-                  }}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(app)/home/ticket/[eventTicketId]/',
-                      params: {
-                        eventTicketId: item.eventTicket.id,
-                        userTicketId: item.id ?? item.userTicketId,
-                      },
-                    })
-                  }
-                />
-              ))}
-            </View>
+        {/* ══════════ TAB: PRODUCTOS ══════════ */}
+        {activeTab === 'productos' && (
+          <View style={styles.section}>
+            {hasPurchases ? (
+              <View style={styles.purchaseList}>
+                {myPurchases.map((group) =>
+                  group.products.map((product) => (
+                    <PurchaseProductCard
+                      key={`${group.eventId}-${product.productId}-${product.status}`}
+                      product={product}
+                      eventName={group.eventName}
+                      eventStartsAt={group.eventStartsAt}
+                    />
+                  ))
+                )}
+              </View>
+            ) : (
+              <View style={styles.purchaseEmpty}>
+                <MaterialCommunityIcons name="shopping-outline" size={40} color={C.dim} />
+                <Text style={styles.purchaseEmptyText}>
+                  Aún no tenés productos comprados
+                </Text>
+              </View>
+            )}
           </View>
         )}
-        {/* ══════════ SECCIÓN: Mis Compras ══════════ */}
-        <View style={[styles.section, { marginTop: (hasCarousel || hasGifted) ? 28 : 0 }]}>
-          <SectionHeader
-            title="Mis Compras"
-            count={purchaseTotalCount}
-            accent={C.magenta}
-          />
-          {hasPurchases ? (
-            <View style={styles.purchaseList}>
-              {myPurchases.map((group) =>
-                group.products.map((product) => (
-                  <PurchaseProductCard
-                    key={`${group.eventId}-${product.productId}-${product.status}`}
-                    product={product}
-                    eventName={group.eventName}
-                    eventStartsAt={group.eventStartsAt}
-                  />
-                ))
-              )}
-            </View>
-          ) : (
-            <View style={styles.purchaseEmpty}>
-              <MaterialCommunityIcons name="shopping-outline" size={40} color={C.dim} />
-              <Text style={styles.purchaseEmptyText}>
-                Aún no tenés compras de productos
-              </Text>
-            </View>
-          )}
-        </View>
       </ScrollView>
     </View>
   )
@@ -500,6 +563,52 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     fontFamily: 'Montserrat_700Bold',
+  },
+
+  // ── Tab bar (pill style)
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: C.card,
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
+    borderRadius: 11,
+  },
+  tabBtnActive: {
+    backgroundColor: C.magenta,
+  },
+  tabBtnText: {
+    color: C.dim,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  tabBtnTextActive: {
+    color: C.white,
+  },
+  tabBadge: {
+    backgroundColor: 'rgba(255,0,255,0.25)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginLeft: 2,
+  },
+  tabBadgeText: {
+    color: C.magenta,
+    fontSize: 10,
+    fontWeight: '800',
   },
 
   // ── Sections

@@ -138,7 +138,7 @@ export default function Index() {
         </View>
         <FlashList
           data={postQuery.data}
-          estimatedItemSize={20}
+          estimatedItemSize={200}
           ListEmptyComponent={() => (
             <View className="py-2">
               <Text className="font-semibold italic text-white">

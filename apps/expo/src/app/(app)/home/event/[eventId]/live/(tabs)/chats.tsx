@@ -43,7 +43,7 @@ export default function Page() {
                     console.log('refresh!');
                     chats.refetch()
                 }} />}
-                estimatedItemSize={20}
+                estimatedItemSize={70}
                 showsVerticalScrollIndicator={false}
                 showsHorizontalScrollIndicator={false}
                 ListEmptyComponent={() => (

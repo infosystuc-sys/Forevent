@@ -277,7 +277,7 @@ const Page: React.FC = () => {
             </View >
             <View className='flex flex-1 w-full h-full' style={{ paddingHorizontal: 15 }}>
                 <FlashList
-                    estimatedItemSize={20}
+                    estimatedItemSize={120}
                     data={purchases.data}
                     keyExtractor={(item, index) => index.toString()}
                     ListEmptyComponent={() => <View className='flex flex-1 items-center justify-center'>
