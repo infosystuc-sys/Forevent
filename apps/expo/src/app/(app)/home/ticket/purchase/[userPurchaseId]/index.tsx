@@ -169,7 +169,7 @@ export default function PurchaseDetailPage() {
   const giftReceiver = purchase.gifts?.[0]?.giftReceiver ?? null
   const canGift = !isDelivered && !hasPendingGift && purchase.ownerId === user?.id
 
-  const qrValue = JSON.stringify({ url: purchase.id, u: user?.id })
+  const qrValue = JSON.stringify({ s: user?.id, p: [purchase.id] })
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>

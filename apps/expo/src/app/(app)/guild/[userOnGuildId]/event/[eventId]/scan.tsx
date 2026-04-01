@@ -13,9 +13,20 @@ export default function App() {
     const { userOnGuildId, eventId } = useLocalSearchParams<{ userOnGuildId: string, eventId: string }>();
     const cameraRef = React.useRef<Camera>(null)
 
-    const qr = api.mobile.event.scanTicket.useMutation({
+    // Mutation para escanear ENTRADAS (empleado con gateId — portero)
+    const scanTicket = api.mobile.event.scanTicket.useMutation({
         onSuccess: () => {
-            Alert.alert('QR escaneado exitosamente')
+            Alert.alert('Entrada escaneada exitosamente')
+        },
+        onError: (error) => {
+            Alert.alert('Error', error.message)
+        }
+    })
+
+    // Mutation para escanear PRODUCTOS (empleado con counterId — cajero/barrero)
+    const scanProducts = api.mobile.event.scanProducts.useMutation({
+        onSuccess: () => {
+            Alert.alert('Productos entregados exitosamente')
         },
         onError: (error) => {
             Alert.alert('Error', error.message)
@@ -34,16 +45,45 @@ export default function App() {
         setScanned(true);
         try {
             const parseData = JSON.parse(scanResult.data);
-            if (!parseData.url || !parseData.u || typeof parseData.url !== 'string' || typeof parseData.u !== 'string') {
-                Alert.alert('QR inválido');
+
+            // QR de PRODUCTO (desde "Mis compras" / purchases):
+            // Formato: { s: userId, p: [purchaseId1, purchaseId2, ...] }
+            if (parseData.s && parseData.p) {
+                const userId = parseData.s;
+                const productIds = Array.isArray(parseData.p) ? parseData.p : [parseData.p];
+
+                if (typeof userId !== 'string' || productIds.some((id: unknown) => typeof id !== 'string')) {
+                    Alert.alert('QR inválido');
+                    return;
+                }
+
+                scanProducts.mutate({
+                    userOnGuildId: userOnGuildId!,
+                    eventId: eventId!,
+                    userId,
+                    userProductsIds: productIds,
+                });
                 return;
             }
-            qr.mutate({
-                userOnGuildId: userOnGuildId!,
-                eventId: eventId!,
-                userId: parseData.u,
-                userTicketId: parseData.url,
-            });
+
+            // QR de ENTRADA (ticket) o COMPRA individual:
+            // Formato: { url: userTicketId | purchaseId, u: userId }
+            if (parseData.url && parseData.u) {
+                if (typeof parseData.url !== 'string' || typeof parseData.u !== 'string') {
+                    Alert.alert('QR inválido');
+                    return;
+                }
+
+                scanTicket.mutate({
+                    userOnGuildId: userOnGuildId!,
+                    eventId: eventId!,
+                    userId: parseData.u,
+                    userTicketId: parseData.url,
+                });
+                return;
+            }
+
+            Alert.alert('QR inválido', 'El código no corresponde a una entrada ni a un producto.');
         } catch (error) {
             Alert.alert('QR inválido');
         }
@@ -63,6 +103,8 @@ export default function App() {
             </View>
         );
     }
+
+    const isLoading = scanTicket.isPending || scanProducts.isPending;
 
     return (
         <View style={{ flex: 1 }}>
@@ -90,10 +132,16 @@ export default function App() {
                         </Pressable>
                     </View>
 
-                    {scanned && (
+                    {scanned && !isLoading && (
                         <Pressable style={styles.scanAgainButton} onPress={() => setScanned(false)}>
                             <Text style={styles.scanAgainText}>Escanear de nuevo</Text>
                         </Pressable>
+                    )}
+
+                    {isLoading && (
+                        <View style={styles.scanAgainButton}>
+                            <Text style={styles.scanAgainText}>Procesando...</Text>
+                        </View>
                     )}
                 </View>
             </Camera>
