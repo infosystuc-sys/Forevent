@@ -1,9 +1,8 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { BarCodeScanner } from 'expo-barcode-scanner';
 import { Camera, CameraType } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import useTheme from '~/hooks/useTheme';
 import { api } from '~/utils/api';
 
@@ -11,82 +10,126 @@ export default function App() {
     const [hasPermission, setHasPermission] = useState<boolean | null>(null);
     const [scanned, setScanned] = useState(false);
     const { colors } = useTheme()
-    const { employeeId, eventId } = useLocalSearchParams<{ employeeId: string, eventId: string }>();
-    const cameraRef = React.useRef<any>(null)
+    const { userOnGuildId, eventId } = useLocalSearchParams<{ userOnGuildId: string, eventId: string }>();
+    const cameraRef = React.useRef<Camera>(null)
 
     const qr = api.mobile.event.scanTicket.useMutation({
         onSuccess: () => {
-            Alert.alert('QR escanedo exitosamente')
+            Alert.alert('QR escaneado exitosamente')
         },
         onError: (error) => {
-            Alert.alert(error.message)
+            Alert.alert('Error', error.message)
         }
     })
 
     useEffect(() => {
-        const getBarCodeScannerPermissions = async () => {
-            const { status } = await BarCodeScanner.requestPermissionsAsync();
+        (async () => {
+            const { status } = await Camera.requestCameraPermissionsAsync();
             setHasPermission(status === 'granted');
-        };
-
-        getBarCodeScannerPermissions();
+        })();
     }, []);
 
-    const handleBarCodeScanned = ({ type, data }: any) => {
+    const handleBarCodeScanned = (scanResult: { type: string; data: string }) => {
+        if (scanned) return;
         setScanned(true);
         try {
-            let parseData = JSON.parse(data)
-            if (!parseData.url || !parseData.u || typeof (parseData.url) !== 'string' || typeof (parseData.u) !== 'string') {
-                Alert.alert(`QR inválido`);
-                return
+            const parseData = JSON.parse(scanResult.data);
+            if (!parseData.url || !parseData.u || typeof parseData.url !== 'string' || typeof parseData.u !== 'string') {
+                Alert.alert('QR inválido');
+                return;
             }
             qr.mutate({
-                userOnGuildId:employeeId! as string,
-                eventId: eventId! as string,
+                userOnGuildId: userOnGuildId!,
+                eventId: eventId!,
                 userId: parseData.u,
-                userTicketId: parseData.url
-            })
+                userTicketId: parseData.url,
+            });
         } catch (error) {
-            Alert.alert(`QR inválido`);
+            Alert.alert('QR inválido');
         }
     };
 
     if (hasPermission === null) {
-        return <Text>Requesting for camera permission</Text>;
+        return (
+            <View style={[styles.container, { backgroundColor: '#000' }]}>
+                <Text style={{ color: '#fff' }}>Solicitando permiso de cámara...</Text>
+            </View>
+        );
     }
     if (hasPermission === false) {
-        return <Text>No access to camera</Text>;
-    }
-
-    function log() {
-        console.log("log")
+        return (
+            <View style={[styles.container, { backgroundColor: '#000' }]}>
+                <Text style={{ color: '#fff' }}>Sin acceso a la cámara</Text>
+            </View>
+        );
     }
 
     return (
-        <Camera ref={cameraRef} className='flex-1' type={CameraType.back} onCameraReady={() => { setScanned(false) }} onBarCodeScanned={handleBarCodeScanned} barCodeScannerSettings={{ barCodeTypes: [BarCodeScanner.Constants.BarCodeType.qr], interval: 5000 }}>
-            <View className='px-10 flex-row w-full z-10 items-center justify-between mt-14 py-5'>
-                <Pressable className='bg-green-500 z-20' onPress={log}>
-                    <MaterialCommunityIcons name='chevron-left' color={colors.text} size={30} style={{ zIndex: 2, }} onPress={() => { console.log("click") }} />
-                </Pressable>
-                <Text style={{ fontWeight: "600", textAlign: 'center', fontSize: 16, color: colors.text }}>
-                    Escanear código
-                </Text>
-                <Pressable className='bg-green-500 z-20' onPress={() => {
-                    console.log("Historial")
-                    router.back()
-                }}>
-                    <MaterialCommunityIcons name='history' color={colors.text} size={30} style={{ zIndex: 2 }} onPress={() => { }} />
-                </Pressable>
-            </View>
-            {scanned && <Button title={'Tap to Scan Again'} onPress={() => setScanned(false)} />}
-        </Camera>
+        <View style={{ flex: 1 }}>
+            <Camera
+                ref={cameraRef}
+                style={StyleSheet.absoluteFill}
+                type={CameraType.back}
+                onCameraReady={() => setScanned(false)}
+                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+                barCodeScannerSettings={{
+                    barCodeTypes: ['qr'],
+                    interval: 5000,
+                }}
+            >
+                <View style={styles.overlay}>
+                    <View style={styles.topBar}>
+                        <Pressable onPress={() => router.back()} hitSlop={12}>
+                            <MaterialCommunityIcons name='chevron-left' color={colors.text} size={30} />
+                        </Pressable>
+                        <Text style={{ fontWeight: '600', fontSize: 16, color: colors.text }}>
+                            Escanear código
+                        </Text>
+                        <Pressable onPress={() => router.back()} hitSlop={12}>
+                            <MaterialCommunityIcons name='history' color={colors.text} size={30} />
+                        </Pressable>
+                    </View>
+
+                    {scanned && (
+                        <Pressable style={styles.scanAgainButton} onPress={() => setScanned(false)}>
+                            <Text style={styles.scanAgainText}>Escanear de nuevo</Text>
+                        </Pressable>
+                    )}
+                </View>
+            </Camera>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        flexDirection: 'column',
         justifyContent: 'center',
+        alignItems: 'center',
+    },
+    overlay: {
+        flex: 1,
+        justifyContent: 'space-between',
+    },
+    topBar: {
+        paddingHorizontal: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: 50,
+        paddingBottom: 10,
+    },
+    scanAgainButton: {
+        alignSelf: 'center',
+        marginBottom: 80,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        borderRadius: 30,
+    },
+    scanAgainText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
