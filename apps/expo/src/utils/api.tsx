@@ -16,7 +16,7 @@ export { type RouterInputs, type RouterOutputs } from "@forevent/api";
 
 const getBaseUrl = () => {
   // Production override (when running a build)
-  const prodUrl = "https://www.foreventapp.com";
+  const prodUrl = "https://forevent-nextjs-kh85nhbqy-tangopuntohogar-2495s-projects.vercel.app";
 
   if (!__DEV__) return prodUrl;
 
