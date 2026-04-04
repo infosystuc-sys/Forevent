@@ -80,7 +80,7 @@ export const userRouter = createTRPCRouter({
         return {
             user: {
                 name: profile.name,
-                image: profile.name
+                image: profile.image
             },
             friendsCount: profile._count.friendsReceiver + profile._count.friendsRequester,
             giftCount: profile._count.giftsReceiver,

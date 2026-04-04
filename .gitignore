@@ -43,6 +43,7 @@ build
 .env.development
 .env.production
 .env.test
+packages/db/.env
 
 # 💻 System Files
 .DS_Store

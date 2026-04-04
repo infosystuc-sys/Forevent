@@ -428,8 +428,7 @@ export const userTicketRouter = createTRPCRouter({
         });
       }
     }
-    // // HAY QUE HACER LAS VALIDADCIONES DE FECHA
-    if (true || dayjs().tz('UTC').isSameOrBefore(pass?.ticket.validUntil)) {
+    if (dayjs().tz('UTC').isSameOrBefore(pass?.ticket.validUntil)) {
       const userTicket = await ctx.prisma.userTicket.update({
         where: {
           id: url.ticketId,

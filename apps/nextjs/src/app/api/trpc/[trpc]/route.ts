@@ -3,22 +3,28 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter, createTRPCContext } from "@forevent/api";
 import { auth } from "@forevent/auth";
 
-/**
- * Configure basic CORS headers
- * You should extend this to match your needs
- */
-function setCorsHeaders(res: Response) {
-  res.headers.set("Access-Control-Allow-Origin", "*");
-  res.headers.set("Access-Control-Request-Method", "*");
+const ALLOWED_ORIGINS = new Set([
+  "https://forevent-nextjs-kh85nhbqy-tangopuntohogar-2495s-projects.vercel.app",
+  "https://foreventapp.com",
+  "https://www.foreventapp.com",
+  "http://localhost:3000",
+  "http://localhost:8082",
+]);
+
+function setCorsHeaders(res: Response, origin: string | null) {
+  const allowedOrigin =
+    origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://foreventapp.com";
+  res.headers.set("Access-Control-Allow-Origin", allowedOrigin);
   res.headers.set("Access-Control-Allow-Methods", "OPTIONS, GET, POST");
-  res.headers.set("Access-Control-Allow-Headers", "*");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type, x-trpc-source");
+  res.headers.set("Vary", "Origin");
 }
 
-export function OPTIONS() {
+export function OPTIONS(req: Request) {
   const response = new Response(null, {
     status: 204,
   });
-  setCorsHeaders(response);
+  setCorsHeaders(response, req.headers.get("origin"));
   return response;
 }
 
@@ -37,7 +43,7 @@ const handler = auth(async (req) => {
     },
   });
 
-  setCorsHeaders(response);
+  setCorsHeaders(response, req.headers.get("origin"));
   return response;
 });
 

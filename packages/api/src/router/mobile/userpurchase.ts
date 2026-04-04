@@ -340,6 +340,24 @@ export const userPurchaseRouter = createTRPCRouter({
 
   ScanQr: publicProcedure.input(z.object({ userPurchaseId: z.string(), employeeId: z.string(), counterId: z.string().optional() })).mutation(async ({ ctx, input }) => {
     const { employeeId, userPurchaseId, counterId } = input
+
+    const employee = await ctx.prisma.userOnGuild.findFirst({
+      where: {
+        id: employeeId,
+        role: 'EMPLOYEE',
+        status: 'ACCEPTED',
+        discharged: true,
+      },
+      select: { id: true },
+    });
+
+    if (!employee) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Empleado no autorizado',
+      });
+    }
+
     const purchase = await ctx.prisma.userPurchase.findUnique({
       where: {
         id: userPurchaseId,

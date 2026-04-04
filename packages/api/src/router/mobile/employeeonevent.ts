@@ -74,7 +74,7 @@ export const employeeOnEventRouter = createTRPCRouter({
   events: publicProcedure.input(z.object({
     userOnGuildId: z.string()
   })).query(async ({ ctx, input }) => {
-    const events = ctx.prisma.employeeOnEvent.findMany({
+    const events = await ctx.prisma.employeeOnEvent.findMany({
       where: {
         userOnGuildId: input.userOnGuildId,
         discharged: true,

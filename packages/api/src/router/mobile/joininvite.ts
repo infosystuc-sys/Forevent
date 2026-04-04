@@ -56,8 +56,9 @@ export const joinInviteRouter = createTRPCRouter({
   modify: publicProcedure.input(z.object({
     accept: z.boolean(),
     joinInviteId: z.string(),
+    userId: z.string(),
   })).mutation(async ({ ctx, input }) => {
-    const { accept, joinInviteId } = input
+    const { accept, joinInviteId, userId } = input
     const invite = await ctx.prisma.invite.findUnique({
       where: {
         id: joinInviteId
@@ -67,6 +68,13 @@ export const joinInviteRouter = createTRPCRouter({
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'Ocurrió un error'
+      })
+    }
+
+    if (invite.userId !== userId) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'No tenés permiso para responder esta invitación'
       })
     }
 
