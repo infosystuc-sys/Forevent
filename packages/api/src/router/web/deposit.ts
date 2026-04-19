@@ -20,7 +20,6 @@ export const depositRouter = createTRPCRouter({
   }),
 
   byGuildId: publicProcedure.input(z.object({ guildId: z.string() })).query(async ({ ctx, input }) => {
-    console.log("haydidi", input.guildId)
     return await ctx.prisma.deposit.findMany({
       where: {
         event: {

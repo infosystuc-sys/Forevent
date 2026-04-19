@@ -1,51 +1,26 @@
-/**
- * EventCardHighlighted
- *
- * Tarjeta grande de evento — réplica fiel del diseño Stitch/Principal.
- *
- * Layout:
- *   ┌────────────────────────────────────┐
- *   │  [image]              [DATE BADGE] │
- *   │  [CATEGORY TAG]                    │
- *   ├────────────────────────────────────┤
- *   │  Nombre del Evento       ♡         │
- *   │  📍 Venue, Ciudad                  │
- *   │  👤👤👤 +123    Desde $2.500       │
- *   └────────────────────────────────────┘
- */
-
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import React, { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { RouterOutputs } from '@forevent/api'
 import { type ArrayElement } from '@forevent/api/types'
 import { blurhash, dayjs, PLACEHOLDER } from '~/utils/constants'
 
-// ─── Brand colors ─────────────────────────────────────────────────────────────
+const { width: SCREEN_W } = Dimensions.get('window')
+const CARD_W = SCREEN_W - 32
+
 const C = {
-    bg:      '#111827',   // card background
-    surface: '#1e2a45',   // slightly lighter surface
+    bg:      '#111827',
     magenta: '#ff00ff',
+    purple:  '#411377',
     white:   '#ffffff',
     dim:     'rgba(255,255,255,0.55)',
-    faint:   'rgba(255,255,255,0.08)',
 }
 
-// Date-badge colors cycle
 const DATE_COLORS = ['#e67e22', '#1abc9c', '#e74c3c', '#9b59b6', '#2980b9']
 
-// Category-tag colors by event category
-const CATEGORY_COLOR: Record<string, string> = {
-    BAR:      '#7e00ff',
-    CULTURAL: '#b666d2',
-    CLUB:     '#1a55ff',
-    SPEED:    '#e74c3c',
-}
-
-// Format price in ARS locale: 2500 → "$ 2.500"
 function formatPrice(value: number): string {
     return new Intl.NumberFormat('es-AR', {
         style: 'currency',
@@ -54,7 +29,6 @@ function formatPrice(value: number): string {
     }).format(value)
 }
 
-// Format month abbreviation: "OCT"
 function formatMonth(date: string | Date): string {
     return dayjs(date).locale('es').format('MMM').toUpperCase().replace('.', '')
 }
@@ -72,25 +46,21 @@ interface Props {
 export default function EventCardHighlighted({ item, index = 0 }: Props) {
     const [liked, setLiked] = useState(false)
 
-    const badgeColor   = DATE_COLORS[index % DATE_COLORS.length]!
-
-    // No category in API — derive a visual label from about/name if needed
+    const badgeColor = DATE_COLORS[index % DATE_COLORS.length]!
     const categoryLabel = item.artists?.[0]?.name ?? 'Evento'
-    const categoryColor = DATE_COLORS[(index + 2) % DATE_COLORS.length]!
 
-    // Tickets are ordered by price asc in the first query, desc in fallback.
-    // Take the minimum price manually.
     const minPrice = item.tickets?.reduce(
         (min, t) => (t.price < min ? t.price : min),
         Infinity
     ) ?? 0
     const safeMin = minPrice === Infinity ? 0 : minPrice
-    const priceLabel = safeMin === 0
-        ? 'Entrada Gratis'
-        : `Desde ${formatPrice(safeMin)}`
+    const priceLabel = safeMin === 0 ? 'Entrada Gratis' : `Desde ${formatPrice(safeMin)}`
     const priceColor = safeMin === 0 ? C.white : C.magenta
 
-    const artists = item.artists ?? []
+    const dateLabel = dayjs(item.startsAt)
+        .locale('es')
+        .format('ddd D [de] MMMM · HH:mm')
+        .replace(/^\w/, (c) => c.toUpperCase())
 
     return (
         <Pressable
@@ -99,90 +69,72 @@ export default function EventCardHighlighted({ item, index = 0 }: Props) {
                 router.push({ pathname: '/(app)/home/event/[eventId]/', params: { eventId: item.id } })
             }
         >
-            {/* ── IMAGE ── */}
-            <View style={styles.imageWrapper}>
-                <Image
-                    source={{ uri: item.image ?? PLACEHOLDER }}
-                    placeholder={blurhash}
-                    cachePolicy="memory-disk"
-                    priority="high"
-                    style={styles.image}
-                    contentFit="cover"
-                />
+            {/* ── IMAGE (fills entire card) ── */}
+            <Image
+                source={{ uri: item.image ?? PLACEHOLDER }}
+                placeholder={blurhash}
+                cachePolicy="memory-disk"
+                priority="high"
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+            />
 
-                {/* Gradient overlay at bottom of image */}
-                <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.55)']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0.4 }}
-                    end={{ x: 0, y: 1 }}
-                    pointerEvents="none"
-                />
+            {/* ── GRADIENT overlay: transparent top → dark bottom ── */}
+            <LinearGradient
+                colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.50)', 'rgba(0,0,0,0.88)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+            />
 
-                {/* Date badge — top right */}
-                <View style={[styles.dateBadge, { backgroundColor: badgeColor }]}>
-                    <Text style={styles.dateBadgeMonth}>{formatMonth(item.startsAt)}</Text>
-                    <Text style={styles.dateBadgeDay}>{formatDay(item.startsAt)}</Text>
-                </View>
-
-                {/* Category tag — bottom left */}
-                <View style={[styles.categoryTag, { backgroundColor: categoryColor }]}>
-                    <Text style={styles.categoryTagText}>{categoryLabel}</Text>
-                </View>
+            {/* ── DATE BADGE — top right ── */}
+            <View style={[styles.dateBadge, { backgroundColor: badgeColor }]}>
+                <Text style={styles.dateBadgeMonth}>{formatMonth(item.startsAt)}</Text>
+                <Text style={styles.dateBadgeDay}>{formatDay(item.startsAt)}</Text>
             </View>
 
-            {/* ── BODY ── */}
-            <View style={styles.body}>
-                {/* Title row */}
-                <View style={styles.titleRow}>
-                    <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
-                    <Pressable
-                        hitSlop={8}
-                        onPress={() => setLiked(v => !v)}
-                        style={styles.likeBtn}
-                    >
-                        <MaterialCommunityIcons
-                            name={liked ? 'heart' : 'heart-outline'}
-                            size={20}
-                            color={liked ? C.magenta : C.dim}
-                        />
-                    </Pressable>
+            {/* ── LIKE — top left ── */}
+            <Pressable
+                hitSlop={8}
+                onPress={() => setLiked(v => !v)}
+                style={styles.likeBtn}
+            >
+                <MaterialCommunityIcons
+                    name={liked ? 'heart' : 'heart-outline'}
+                    size={20}
+                    color={liked ? C.magenta : C.white}
+                />
+            </Pressable>
+
+            {/* ── BOTTOM CONTENT ── */}
+            <View style={styles.bottom}>
+                {/* Category tag */}
+                <View style={styles.categoryTag}>
+                    <Text style={styles.categoryTagText}>{categoryLabel}</Text>
                 </View>
+
+                {/* Event name */}
+                <Text style={styles.title} numberOfLines={2}>{item.name}</Text>
 
                 {/* Location */}
                 {item.location && (
-                    <View style={styles.locationRow}>
+                    <View style={styles.metaRow}>
                         <MaterialCommunityIcons name="map-marker-outline" size={13} color={C.dim} />
-                        <Text style={styles.locationText} numberOfLines={1}>
-                            {item.location.name}, {item.location.city}
+                        <Text style={styles.metaText} numberOfLines={1}>
+                            {item.location.name ?? item.location.address}, {item.location.city}
                         </Text>
                     </View>
                 )}
 
-                {/* Footer: avatars (artists) + price */}
-                <View style={styles.footer}>
-                    <View style={styles.avatarsRow}>
-                        {artists.slice(0, 3).map((a, i) => (
-                            <View key={a.id} style={[styles.avatarWrapper, { left: i * 16 }]}>
-                                <Image
-                                    source={{ uri: a.image ?? PLACEHOLDER }}
-                                    style={styles.avatar}
-                                    contentFit="cover"
-                                />
-                            </View>
-                        ))}
-                        {artists.length > 0 && (
-                            <Text style={[styles.attendeeCount, { marginLeft: Math.min(artists.length, 3) * 16 + 4 }]}>
-                                {artists.length} artista{artists.length > 1 ? 's' : ''}
-                            </Text>
-                        )}
-                    </View>
-
-                    {/* Price */}
-                    <Text style={[styles.price, { color: priceColor }]}>
-                        {priceLabel}
-                    </Text>
+                {/* Date */}
+                <View style={styles.metaRow}>
+                    <MaterialCommunityIcons name="calendar-outline" size={13} color={C.dim} />
+                    <Text style={styles.metaText}>{dateLabel}</Text>
                 </View>
+
+                {/* Price */}
+                <Text style={[styles.price, { color: priceColor }]}>{priceLabel}</Text>
             </View>
         </Pressable>
     )
@@ -190,29 +142,18 @@ export default function EventCardHighlighted({ item, index = 0 }: Props) {
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: C.bg,
+        width: CARD_W,
+        height: 300,
         borderRadius: 16,
         overflow: 'hidden',
         marginHorizontal: 16,
+        backgroundColor: C.bg,
     },
 
-    // Image
-    imageWrapper: {
-        width: '100%',
-        aspectRatio: 16 / 9,
-    },
-    image: {
-        width: '100%',
-        height: '100%',
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-    },
-
-    // Date badge
     dateBadge: {
         position: 'absolute',
-        top: 10,
-        right: 10,
+        top: 12,
+        right: 12,
         borderRadius: 8,
         paddingHorizontal: 10,
         paddingVertical: 5,
@@ -232,14 +173,31 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
 
-    // Category tag
-    categoryTag: {
+    likeBtn: {
         position: 'absolute',
-        bottom: 10,
-        left: 10,
+        top: 12,
+        left: 12,
+        padding: 4,
+    },
+
+    bottom: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingHorizontal: 14,
+        paddingBottom: 16,
+        paddingTop: 10,
+        gap: 5,
+    },
+
+    categoryTag: {
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(255,0,255,0.25)',
         borderRadius: 50,
         paddingHorizontal: 10,
-        paddingVertical: 4,
+        paddingVertical: 3,
+        marginBottom: 2,
     },
     categoryTagText: {
         color: '#fff',
@@ -247,72 +205,27 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // Body
-    body: {
-        paddingHorizontal: 14,
-        paddingTop: 12,
-        paddingBottom: 14,
-        gap: 6,
-    },
-    titleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
     title: {
         color: C.white,
-        fontSize: 16,
-        fontWeight: '700',
-        flex: 1,
-        marginRight: 8,
+        fontSize: 18,
+        fontWeight: '800',
+        lineHeight: 22,
     },
-    likeBtn: {
-        padding: 2,
-    },
-    locationRow: {
+
+    metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
     },
-    locationText: {
+    metaText: {
         color: C.dim,
         fontSize: 12,
         flex: 1,
     },
 
-    // Footer
-    footer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginTop: 2,
-    },
-    avatarsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        position: 'relative',
-        height: 28,
-        flex: 1,
-    },
-    avatarWrapper: {
-        position: 'absolute',
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        borderWidth: 1.5,
-        borderColor: C.bg,
-        overflow: 'hidden',
-    },
-    avatar: {
-        width: '100%',
-        height: '100%',
-    },
-    attendeeCount: {
-        color: C.dim,
-        fontSize: 11,
-    },
     price: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '700',
+        marginTop: 2,
     },
 })

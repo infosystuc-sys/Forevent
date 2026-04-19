@@ -22,7 +22,7 @@ import {
 } from "@tanstack/react-table"
 import { Container, DoorOpen, MapPinned, Mic2, Package, Pizza, SquarePen, Ticket, Warehouse, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { Fragment, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { CountryDropdown, RegionDropdown } from "react-country-region-selector"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -128,7 +128,7 @@ const completeEventSchema = z.object({
         state: z.string().min(2, { message: "Este campo es requerido" }),
         city: z.string().min(2, { message: "Este campo es requerido" }),
         address: z.string().min(2, { message: "Este campo es requerido" }),
-        image: z.string().url().min(2, { message: "Este campo es requerido" }),
+        image: z.string().url().optional(),
     }),
     gates: z.array(
         z.object({
@@ -141,6 +141,7 @@ const completeEventSchema = z.object({
     ).min(1, { message: "Este campo es requerido" }),
     tickets: z.array(
         z.object({
+            id: z.string().optional(),
             name: z.string(),
             price: z.number(),
             quantity: z.number(),
@@ -151,7 +152,7 @@ const completeEventSchema = z.object({
     artists: z.array(
         z.object({
             name: z.string(),
-            image: z.string().url()
+            image: z.string().url().optional()
         })
     ).optional(),
     deposits: z.array(
@@ -177,6 +178,7 @@ const completeEventSchema = z.object({
     ).optional(),
     products: z.array(
         z.object({
+            id: z.string().optional(),
             name: z.string(),
             type: z.enum(["FOOD", "DRINK", "CONSUMABLE"]),
             image: z.string().url(),
@@ -231,7 +233,7 @@ const productSchema = z.object({
 
 const artistSchema = z.object({
     name: z.string().min(2, { message: "Este campo es requerido" }),
-    image: z.string().url().min(2, { message: "Este campo es requerido" }),
+    image: z.string().url().optional(),
 })
 
 const productOnDepositSchema = z.object({
@@ -413,12 +415,13 @@ interface LocationSearch {
 
 const libraries: Libraries = ["places"]
 
-export default function CreateEvent({ guildId, employees }: { guildId: string, employees: RouterOutputs['web']['userOnGuild']['getEmployees'] }) {
+export default function CreateEvent({ guildId, employees, initialEvent, eventId }: { guildId: string, employees: RouterOutputs['web']['userOnGuild']['getEmployees'], initialEvent?: RouterOutputs['web']['event']['byId'], eventId?: string }) {
     const route = useRouter()
     const utils = api.useUtils()
     const [coords, setCoords] = useState<{ lat: number, lng: number }>({ lat: -26.813688063759642, lng: -65.29143912682017 })
     const [step, setStep] = useState<'DETAILS' | 'GATES' | 'LOCATION' | 'TICKETS' | 'DEPOSITS' | 'PRODUCTS' | 'ARTISTS' | 'COUNTERS' | 'PRODUCTSONDEPOSIT'>('DETAILS')
     const [searchBox, setSearchBox] = useState<google.maps.places.SearchBox | null>(null);
+    const [locationId, setLocationId] = useState<string | undefined>(undefined)
     const mapRef = useRef<GoogleMap>(null)
 
     const getEmployees = api.web.userOnGuild.getEmployees.useQuery({ guildId }, {
@@ -442,7 +445,25 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
         }
     })
 
+    const updateEvent = api.web.event.fullUpdate.useMutation({
+        onSuccess: async (result) => {
+            toast.success("Evento actualizado con éxito")
+            await utils.web.event.byGuildId.invalidate()
+            await utils.web.event.byId.invalidate({ id: result.id })
+            route.push(`/v1/${guildId}/events/${result.id}`)
+        },
+        onError: (error) => {
+            console.error("[updateEvent] Error del servidor:", error)
+            toast.error(error.message ?? "Error al actualizar el evento")
+        }
+    })
+
     const [productImageUploading, setProductImageUploading] = useState(false)
+    const [editingTicketIndex, setEditingTicketIndex] = useState<number | null>(null)
+    const [editingProductIndex, setEditingProductIndex] = useState<number | null>(null)
+    const [editingDepositData, setEditingDepositData] = useState<{ counters: z.infer<typeof completeEventSchema>['deposits'][0]['counters'], productsOnDeposit: z.infer<typeof completeEventSchema>['deposits'][0]['productsOnDeposit'] } | null>(null)
+    const [editingCounterInfo, setEditingCounterInfo] = useState<{ depositName: string, indexDep: number, indexCounter: number } | null>(null)
+    const [editingProductOnDepositInfo, setEditingProductOnDepositInfo] = useState<{ depositIndex: number, productIndex: number } | null>(null)
     const [rowSelection, setRowSelection] = useState({})
     const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -500,7 +521,16 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
 
     const onSubmitCompleteEvent = async (values: z.infer<typeof completeEventSchema>) => {
         console.log("[createEvent] Datos enviados:", values)
-        createEvent.mutate({ ...values, guildId })
+        if (eventId && locationId) {
+            updateEvent.mutate({
+                eventId,
+                guildId,
+                ...values,
+                location: { id: locationId, ...values.location },
+            })
+        } else {
+            createEvent.mutate({ ...values, guildId })
+        }
     }
 
     const onValidationError = (errors: Record<string, unknown>) => {
@@ -544,8 +574,18 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
         mode: "onSubmit"
     })
 
+    const handleEditGate = (gate: z.infer<typeof completeEventSchema>['gates'][0], index: number) => {
+        gateForm.reset({ name: gate.name, about: gate.about ?? "" })
+        const newSelection: Record<string, boolean> = {}
+        getEmployees.data.forEach((emp, rowIdx) => {
+            if (gate.employees.includes(emp.id)) newSelection[rowIdx.toString()] = true
+        })
+        setRowSelection(newSelection)
+        completeEventForm.setValue('gates', completeEventForm.getValues('gates').filter((_, i) => i !== index))
+        setStep('GATES')
+    }
+
     const onSubmitGate = async (values: z.infer<typeof gateSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
         if (completeEventForm.watch('gates')?.some((gate) => gate.name === values.name)) {
             gateForm.setError('name', { message: 'Ya existe esta puerta' })
         } else {
@@ -565,15 +605,50 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
         mode: "onChange"
     })
 
+    const handleEditDeposit = (deposit: z.infer<typeof completeEventSchema>['deposits'][0], index: number) => {
+        depositForm.reset({ name: deposit.name, about: deposit.about ?? "" })
+        setEditingDepositData({ counters: deposit.counters, productsOnDeposit: deposit.productsOnDeposit })
+        completeEventForm.setValue('deposits', completeEventForm.getValues('deposits')?.filter((_, i) => i !== index) ?? [])
+        setStep('DEPOSITS')
+    }
+
     const onSubmitDeposit = async (values: z.infer<typeof depositSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
         if (completeEventForm.watch('deposits')?.some((deposit) => deposit.name === values.name)) {
             depositForm.setError('name', { message: 'Ya existe este deposito' })
         } else {
             const a = completeEventForm.watch('deposits') ?? []
-            completeEventForm.setValue('deposits', [...a, { ...values, counters: [], productsOnDeposit: [] }])
+            completeEventForm.setValue('deposits', [...a, {
+                ...values,
+                counters: editingDepositData?.counters ?? [],
+                productsOnDeposit: editingDepositData?.productsOnDeposit ?? [],
+            }])
+            setEditingDepositData(null)
             depositForm.reset()
         }
+    }
+
+    const handleEditCounter = (counter: z.infer<typeof completeEventSchema>['deposits'][0]['counters'][0], depositName: string, indexDep: number, indexCounter: number) => {
+        counterForm.reset({ name: counter.name, about: counter.about ?? "", deposit: depositName, employees: counter.employees })
+        const newSelection: Record<string, boolean> = {}
+        employees?.forEach((emp, i) => {
+            if (counter.employees.includes(emp.id)) newSelection[i.toString()] = true
+        })
+        setRowSelection(newSelection)
+        const deposits = completeEventForm.getValues('deposits') ?? []
+        deposits[indexDep]!.counters = deposits[indexDep]!.counters.filter((_, i) => i !== indexCounter)
+        completeEventForm.setValue('deposits', deposits)
+        setEditingCounterInfo({ depositName, indexDep, indexCounter })
+        setStep('COUNTERS')
+    }
+
+    const handleEditProductOnDeposit = (prod: { name: string, quantity: number }, depositIndex: number, productIndex: number) => {
+        const depositName = completeEventForm.getValues('deposits')?.[depositIndex]?.name ?? ""
+        productOnDepositForm.reset({ productName: prod.name, depositName, quantity: prod.quantity })
+        const deposits = completeEventForm.getValues('deposits') ?? []
+        deposits[depositIndex]!.productsOnDeposit = deposits[depositIndex]!.productsOnDeposit.filter((_, i) => i !== productIndex)
+        completeEventForm.setValue('deposits', deposits)
+        setEditingProductOnDepositInfo({ depositIndex, productIndex })
+        setStep('PRODUCTSONDEPOSIT')
     }
 
     const counterForm = useForm<z.infer<typeof counterSchema>>({
@@ -588,20 +663,20 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
     })
 
     const onSubmitCounter = async (values: z.infer<typeof counterSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
-        if (completeEventForm.watch('deposits')?.some((deposit) => deposit.counters.some((counter) => counter.name === values.name))) {
+        const deposits = completeEventForm.watch('deposits') ?? []
+        const isDuplicate = deposits.some((deposit) => deposit.counters.some((counter) => counter.name === values.name))
+        if (editingCounterInfo === null && isDuplicate) {
             counterForm.setError('name', { message: `Este mostrador ya existe` })
         } else {
-            const deposits = completeEventForm.watch('deposits') ?? []
-            deposits.map((dep, index) => {
+            deposits.forEach((dep, index) => {
                 if (dep.name === values.deposit) {
                     const { deposit, employees, ...a } = values
                     deposits[index]?.counters.push({ ...a, employees: employeeTable.getSelectedRowModel().rows.map(row => row.original.id) })
                 }
             })
-            console.log("new deposit", deposits)
             completeEventForm.setValue('deposits', deposits)
             employeeTable.resetRowSelection(true)
+            setEditingCounterInfo(null)
             counterForm.reset()
         }
     }
@@ -619,12 +694,20 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
     })
 
     const onSubmitTicket = async (values: z.infer<typeof ticketSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
-        if (completeEventForm.watch('tickets')?.some((tick) => tick.name === values.name)) {
-            ticketForm.setError('name', { message: 'Ya existe este ticket' })
-        } else {
-            completeEventForm.setValue("tickets", [...completeEventForm.watch("tickets"), values])
+        if (editingTicketIndex !== null) {
+            const tickets = [...completeEventForm.getValues('tickets')]
+            const existing = tickets[editingTicketIndex]
+            tickets[editingTicketIndex] = { ...values, id: existing?.id }
+            completeEventForm.setValue("tickets", tickets)
+            setEditingTicketIndex(null)
             ticketForm.reset()
+        } else {
+            if (completeEventForm.watch('tickets')?.some((tick) => tick.name === values.name)) {
+                ticketForm.setError('name', { message: 'Ya existe este ticket' })
+            } else {
+                completeEventForm.setValue("tickets", [...completeEventForm.watch("tickets"), values])
+                ticketForm.reset()
+            }
         }
     }
 
@@ -641,12 +724,20 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
     })
 
     const onSubmitProduct = async (values: z.infer<typeof productSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
-        if (completeEventForm.watch('products')?.some((prod) => prod.name === values.name)) {
-            productForm.setError('name', { message: 'Ya existe este producto' })
-        } else {
-            completeEventForm.setValue("products", [...completeEventForm.watch("products") ?? [], values])
+        if (editingProductIndex !== null) {
+            const products = [...(completeEventForm.getValues('products') ?? [])]
+            const existing = products[editingProductIndex]
+            products[editingProductIndex] = { ...values, id: existing?.id }
+            completeEventForm.setValue("products", products)
+            setEditingProductIndex(null)
             productForm.reset()
+        } else {
+            if (completeEventForm.watch('products')?.some((prod) => prod.name === values.name)) {
+                productForm.setError('name', { message: 'Ya existe este producto' })
+            } else {
+                completeEventForm.setValue("products", [...(completeEventForm.watch("products") ?? []), values])
+                productForm.reset()
+            }
         }
     }
 
@@ -659,12 +750,17 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
         mode: "onChange"
     })
 
+    const handleEditArtist = (artist: { name: string; image?: string }, index: number) => {
+        artistForm.reset({ name: artist.name, image: artist.image ?? "" })
+        completeEventForm.setValue('artists', (completeEventForm.getValues('artists') ?? []).filter((_, i) => i !== index))
+        setStep('ARTISTS')
+    }
+
     const onSubmitArtist = async (values: z.infer<typeof artistSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
         if (completeEventForm.watch('artists')?.some((art) => art.name === values.name)) {
             artistForm.setError('name', { message: 'Ya existe este artista' })
         } else {
-            completeEventForm.setValue("artists", [...completeEventForm.watch("artists") ?? [], values])
+            completeEventForm.setValue("artists", [...(completeEventForm.watch("artists") ?? []), values])
             artistForm.reset()
         }
     }
@@ -680,21 +776,87 @@ export default function CreateEvent({ guildId, employees }: { guildId: string, e
     })
 
     const onSubmitProductOnDeposit = async (values: z.infer<typeof productOnDepositSchema>) => {
-        console.log(values, "VALUES DEL FORM!")
-        if (completeEventForm.watch('deposits')?.some(depo => depo.name === values.depositName && depo.productsOnDeposit.some((prod => prod.name === values.productName)))) {
+        const isDuplicate = completeEventForm.watch('deposits')?.some(depo => depo.name === values.depositName && depo.productsOnDeposit.some((prod => prod.name === values.productName)))
+        if (editingProductOnDepositInfo === null && isDuplicate) {
             productOnDepositForm.setError('productName', { message: `Ya existe este producto en "${values.depositName}"` })
         } else {
             const deposits = completeEventForm.watch('deposits') ?? []
-            deposits.map((dep, index) => {
+            deposits.forEach((dep, index) => {
                 if (dep.name === values.depositName) {
                     deposits[index]?.productsOnDeposit.push({ quantity: values.quantity, name: values.productName })
                 }
             })
-            console.log("new deposit", deposits)
             completeEventForm.setValue('deposits', deposits)
+            setEditingProductOnDepositInfo(null)
             productOnDepositForm.reset()
         }
     }
+
+    useEffect(() => {
+        if (!initialEvent) return
+        const e = initialEvent
+        setLocationId(e.location?.id)
+        if (e.location) {
+            setCoords({ lat: e.location.latitude, lng: e.location.longitude })
+        }
+        completeEventForm.reset({
+            name: e.name ?? "",
+            about: e.about ?? "",
+            image: e.image ?? "",
+            startsAt: e.startsAt ? new Date(e.startsAt).toISOString().slice(0, 16) : "",
+            endsAt: e.endsAt ? new Date(e.endsAt).toISOString().slice(0, 16) : "",
+            private: e.private ?? false,
+            location: {
+                name: e.location?.name ?? "",
+                latitude: e.location?.latitude ?? 0,
+                longitude: e.location?.longitude ?? 0,
+                iana: e.location?.iana ?? "UTC",
+                country: e.location?.country ?? "",
+                state: e.location?.state ?? "",
+                city: e.location?.city ?? "",
+                address: e.location?.address ?? "",
+                image: e.location?.image ?? "",
+            },
+            gates: e.gates?.map(g => ({
+                name: g.name,
+                about: g.about ?? undefined,
+                employees: g.employeeOnEvent?.map(eoe => eoe.userOnGuild.id) ?? [],
+            })) ?? [],
+            tickets: e.tickets?.map(t => ({
+                id: t.id,
+                name: t.name,
+                price: t.price,
+                quantity: t.quantity,
+                about: t.about ?? undefined,
+                validUntil: t.validUntil ? new Date(t.validUntil).toISOString().slice(0, 16) : undefined,
+            })) ?? [],
+            artists: e.artists?.map(a => ({
+                name: a.name,
+                image: a.image ?? undefined,
+            })),
+            deposits: e.deposits?.map(d => ({
+                name: d.name,
+                about: d.about ?? undefined,
+                counters: d.counter?.map(c => ({
+                    name: c.name,
+                    about: c.about ?? undefined,
+                    employees: c.employeeOnEvent?.map(eoe => eoe.userOnGuild.id) ?? [],
+                })) ?? [],
+                productsOnDeposit: d.productsOnDeposit?.map(pod => ({
+                    name: pod.product.name,
+                    quantity: pod.quantity,
+                })) ?? [],
+            })),
+            products: e.products?.map(p => ({
+                id: p.id,
+                name: p.name,
+                type: p.type as "FOOD" | "DRINK" | "CONSUMABLE",
+                image: p.image,
+                about: p.about ?? undefined,
+                price: p.price,
+            })),
+        })
+    }, [initialEvent])
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
     const { isLoaded, loadError } = useLoadScript({
@@ -778,13 +940,13 @@ return (
                 <Return />
                 <div className="flex flex-1 justify-between items-start">
                     <CardHeader className="pt-2">
-                        <CardTitle>Crear evento</CardTitle>
+                        <CardTitle>{eventId ? "Editar evento" : "Crear evento"}</CardTitle>
                         <CardDescription>
                             Aqui deberas ingresar los detalles de tu evento, artistas, tiendas, barras, empleados, etc.
                         </CardDescription>
                     </CardHeader>
                     <Button
-                        disabled={createEvent.isPending}
+                        disabled={createEvent.isPending || updateEvent.isPending}
                         type="button"
                         onClick={() => {
                             if (!googleMapsApiKey) {
@@ -799,10 +961,10 @@ return (
                         }}
                         variant={"default"}
                     >
-                        {createEvent.isPending ?
+                        {(createEvent.isPending || updateEvent.isPending) ?
                             <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                             :
-                            "Confirmar y crear evento"
+                            (eventId ? "Guardar cambios" : "Confirmar y crear evento")
                         }
                     </Button>
                 </div>
@@ -1020,26 +1182,28 @@ return (
                                                                 </FormItem>
                                                             )} />
                                                             <div className="w-full h-[30vh]">
-                                                                <GoogleMap
-                                                                    options={{ backgroundColor: "#222", fullscreenControl: false, streetViewControl: false, mapTypeControl: false, styles: mapStyle, center: coords }}
-                                                                    onClick={(e: google.maps.MapMouseEvent) => {
-                                                                        const latLng = e.latLng
-                                                                        if (!latLng) return
-                                                                        const lat = typeof latLng.lat === "function" ? latLng.lat() : latLng.lat
-                                                                        const lng = typeof latLng.lng === "function" ? latLng.lng() : latLng.lng
-                                                                        setCoords({ lat, lng })
-                                                                        completeEventForm.setValue("location.latitude", lat)
-                                                                        completeEventForm.setValue("location.longitude", lng)
-                                                                    }}
-                                                                    zoom={15}
-                                                                    center={coords}
-                                                                    ref={mapRef}
-                                                                    mapContainerClassName="w-full h-full"
-                                                                >
-                                                                    {completeEventForm.watch("location.latitude") != null && completeEventForm.watch("location.longitude") != null && (
-                                                                        <Marker position={{ lat: completeEventForm.watch("location.latitude")!, lng: completeEventForm.watch("location.longitude")! }} />
-                                                                    )}
-                                                                </GoogleMap>
+                                                                {step === "LOCATION" && (
+                                                                    <GoogleMap
+                                                                        options={{ backgroundColor: "#222", fullscreenControl: false, streetViewControl: false, mapTypeControl: false, styles: mapStyle, center: coords }}
+                                                                        onClick={(e: google.maps.MapMouseEvent) => {
+                                                                            const latLng = e.latLng
+                                                                            if (!latLng) return
+                                                                            const lat = typeof latLng.lat === "function" ? latLng.lat() : latLng.lat
+                                                                            const lng = typeof latLng.lng === "function" ? latLng.lng() : latLng.lng
+                                                                            setCoords({ lat, lng })
+                                                                            completeEventForm.setValue("location.latitude", lat)
+                                                                            completeEventForm.setValue("location.longitude", lng)
+                                                                        }}
+                                                                        zoom={15}
+                                                                        center={coords}
+                                                                        ref={mapRef}
+                                                                        mapContainerClassName="w-full h-full"
+                                                                    >
+                                                                        {completeEventForm.watch("location.latitude") != null && completeEventForm.watch("location.longitude") != null && (
+                                                                            <Marker position={{ lat: completeEventForm.watch("location.latitude")!, lng: completeEventForm.watch("location.longitude")! }} />
+                                                                        )}
+                                                                    </GoogleMap>
+                                                                )}
                                                             </div>
                                                         </form>
                                                     </Form>
@@ -1055,7 +1219,7 @@ return (
                                                             )} />
                                                             <FormField control={completeEventForm.control} name="location.image" render={({ field }) => (
                                                                 <FormItem {...field} className="w-full">
-                                                                    <FormLabel>Foto*</FormLabel>
+                                                                    <FormLabel>Foto</FormLabel>
                                                                     <FormControl className="">
                                                                         <div className="flex items-center justify-center">
                                                                             {completeEventForm.watch("location.image") ? (
@@ -1266,6 +1430,7 @@ return (
                                                                         <h1 className="font-bold">{gate.name}</h1>
                                                                         <p>{gate.about}</p>
                                                                     </div>
+                                                                    <Button type="button" size="sm" variant="outline" onClick={() => handleEditGate(gate, index)}>Editar</Button>
                                                                     <Toggle aria-label="Toggle bold">
                                                                         <X className="h-5 w-5" color="white" onClick={() => {
                                                                             completeEventForm.setValue('gates', completeEventForm.watch('gates').filter((_, i) => index !== i))
@@ -1433,9 +1598,14 @@ return (
                                                     </div>
                                                 </div>
                                             </CardContent>
-                                            <CardFooter className="flex items-center justify-center">
+                                            <CardFooter className="flex items-center justify-center gap-3">
+                                                {editingCounterInfo !== null && (
+                                                    <Button variant={"ghost"} type="button" onClick={() => { setEditingCounterInfo(null); counterForm.reset(); employeeTable.resetRowSelection(true) }}>
+                                                        Cancelar
+                                                    </Button>
+                                                )}
                                                 <Button variant={"outline"} type="submit">
-                                                    Agregar mostrador
+                                                    {editingCounterInfo !== null ? "Guardar cambios" : "Agregar mostrador"}
                                                 </Button>
                                             </CardFooter>
                                         </form>
@@ -1459,15 +1629,20 @@ return (
                                                                                 <h1 className="font-bold">{counter.name}</h1>
                                                                                 <p>{counter.about}</p>
                                                                             </div>
-                                                                            <Toggle aria-label="Toggle bold">
-                                                                                <X className="h-5 w-5" color="white" onClick={() => {
+                                                                            <div className='flex gap-2'>
+                                                                                <Button size="sm" variant="outline" type="button" onClick={() => handleEditCounter(counter, deposit.name, indexDep, indexCounter)}>
+                                                                                    Editar
+                                                                                </Button>
+                                                                                <Button size="sm" variant="destructive" type="button" onClick={() => {
                                                                                     const depositsCorrected = completeEventForm.watch('deposits')
                                                                                     if (depositsCorrected?.[indexDep]?.counters) {
                                                                                         depositsCorrected[indexDep].counters = depositsCorrected[indexDep]?.counters.filter((_, i) => indexCounter !== i) ?? []
                                                                                         completeEventForm.setValue('deposits', depositsCorrected)
                                                                                     }
-                                                                                }} />
-                                                                            </Toggle>
+                                                                                }}>
+                                                                                    Eliminar
+                                                                                </Button>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 )
@@ -1590,9 +1765,14 @@ return (
                                                     />
                                                 </div>
                                             </CardContent>
-                                            <CardFooter className="flex items-center justify-center">
+                                            <CardFooter className="flex items-center justify-center gap-3">
+                                                {editingTicketIndex !== null && (
+                                                    <Button variant="ghost" type="button" onClick={() => { setEditingTicketIndex(null); ticketForm.reset() }}>
+                                                        Cancelar
+                                                    </Button>
+                                                )}
                                                 <Button variant={"outline"} type="submit">
-                                                    Agregar ticket
+                                                    {editingTicketIndex !== null ? "Guardar cambios" : "Agregar ticket"}
                                                 </Button>
                                             </CardFooter>
                                         </form>
@@ -1621,8 +1801,14 @@ return (
                                                                         <p>x</p>
                                                                         <p>{ticket.quantity.toLocaleString()}</p>
                                                                     </div>
+                                                                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                                                                        setEditingTicketIndex(index)
+                                                                        ticketForm.reset({ name: ticket.name, price: ticket.price, quantity: ticket.quantity, about: ticket.about ?? "", validUntil: ticket.validUntil ?? "" })
+                                                                        setStep('TICKETS')
+                                                                    }}>Editar</Button>
                                                                     <Toggle aria-label="Toggle bold">
                                                                         <X className="h-5 w-5" color="white" onClick={() => {
+                                                                            if (editingTicketIndex === index) { setEditingTicketIndex(null); ticketForm.reset() }
                                                                             completeEventForm.setValue('tickets', completeEventForm.watch('tickets').filter((_, i) => index !== i))
                                                                         }} />
                                                                     </Toggle>
@@ -1676,7 +1862,7 @@ return (
                                                         name="image"
                                                         render={({ field }) => (
                                                             <FormItem  {...field} className="w-full">
-                                                                <FormLabel>Foto*</FormLabel>
+                                                                <FormLabel>Foto</FormLabel>
                                                                 <FormControl className="">
                                                                     <div className="flex items-center justify-center">
                                                                         {artistForm.watch("image") ?
@@ -1755,6 +1941,7 @@ return (
                                                                         </Avatar>
                                                                         <h1 className="font-bold">{artist.name}</h1>
                                                                     </div>
+                                                                    <Button type="button" size="sm" variant="outline" onClick={() => handleEditArtist(artist, index)}>Editar</Button>
                                                                     <Toggle aria-label="Toggle bold">
                                                                         <X className="h-5 w-5" color="white" onClick={() => {
                                                                             completeEventForm.setValue('artists', completeEventForm.watch('artists')?.filter((_, i) => index !== i))
@@ -1825,9 +2012,14 @@ return (
                                                     />
                                                 </div>
                                             </CardContent>
-                                            <CardFooter className="flex items-center justify-center">
+                                            <CardFooter className="flex items-center justify-center gap-3">
+                                                {editingDepositData !== null && (
+                                                    <Button variant="ghost" type="button" onClick={() => { setEditingDepositData(null); depositForm.reset() }}>
+                                                        Cancelar
+                                                    </Button>
+                                                )}
                                                 <Button variant={"outline"} type="submit">
-                                                    Agregar deposito
+                                                    {editingDepositData !== null ? "Guardar cambios" : "Agregar deposito"}
                                                 </Button>
                                             </CardFooter>
                                         </form>
@@ -1851,54 +2043,50 @@ return (
                                                                             {deposit.about}
                                                                         </p>
                                                                     </div>
-                                                                    <div className='flex space-x-2 items-center'>
+                                                                    <div className='flex gap-2 items-center'>
                                                                         <Dialog>
                                                                             <DialogTrigger asChild>
-                                                                                <Button variant="outline">Productos {`(${deposit.productsOnDeposit.length})`}</Button>
+                                                                                <Button variant="outline" size="sm">Productos {`(${deposit.productsOnDeposit.length})`}</Button>
                                                                             </DialogTrigger>
                                                                             <DialogContent className="sm:max-w-[425px]">
                                                                                 <DialogHeader>
                                                                                     <DialogTitle>{deposit.name}</DialogTitle>
                                                                                     <DialogDescription>
-                                                                                        Estos son los productos de {deposit.name}
+                                                                                        Productos asignados a {deposit.name}
                                                                                     </DialogDescription>
                                                                                 </DialogHeader>
-                                                                                {deposit.productsOnDeposit.map((prod, pOnDepIndex) => {
-                                                                                    return (
-                                                                                        <div className="pb-4" key={index.toString()}>
-                                                                                            <div className='flex flex-1 justify-between items-center gap-2'>
-                                                                                                <div className='space-y-1'>
-                                                                                                    <h1 className="font-bold">{prod.name}</h1>
-                                                                                                </div>
-                                                                                                <div className='flex flex-1 gap-1 items-center justify-end'>
-                                                                                                    <p>{prod.quantity}</p>
-                                                                                                    <p>ud</p>
-                                                                                                </div>
-                                                                                                <Toggle aria-label="Toggle bold">
-                                                                                                    <X className="h-5 w-5" color="white" onClick={() => {
-                                                                                                        const depositsCorrected = completeEventForm.watch('deposits')
-                                                                                                        if (depositsCorrected?.[index]?.productsOnDeposit) {
-                                                                                                            depositsCorrected[index].productsOnDeposit = depositsCorrected[index]?.productsOnDeposit.filter((_, i) => pOnDepIndex !== i) ?? []
-                                                                                                            completeEventForm.setValue('deposits', depositsCorrected)
-                                                                                                        }
-                                                                                                    }} />
-                                                                                                </Toggle>
+                                                                                {deposit.productsOnDeposit.map((prod, pOnDepIndex) => (
+                                                                                    <div className="pb-4" key={pOnDepIndex.toString()}>
+                                                                                        <div className='flex flex-1 justify-between items-center gap-2'>
+                                                                                            <h1 className="font-bold">{prod.name}</h1>
+                                                                                            <div className='flex gap-1 items-center'>
+                                                                                                <p>{prod.quantity} ud</p>
                                                                                             </div>
+                                                                                            <Button size="sm" variant="ghost" type="button" onClick={() => {
+                                                                                                const deps = [...(completeEventForm.getValues('deposits') ?? [])]
+                                                                                                if (deps[index]) {
+                                                                                                    deps[index].productsOnDeposit = deps[index].productsOnDeposit.filter((_, i) => i !== pOnDepIndex)
+                                                                                                    completeEventForm.setValue('deposits', deps)
+                                                                                                }
+                                                                                            }}><X className="h-4 w-4" /></Button>
                                                                                         </div>
-                                                                                    )
-                                                                                })}
+                                                                                    </div>
+                                                                                ))}
                                                                                 <DialogFooter>
-                                                                                    <DialogClose>
+                                                                                    <DialogClose asChild>
                                                                                         <Button type="button">Cerrar</Button>
                                                                                     </DialogClose>
                                                                                 </DialogFooter>
                                                                             </DialogContent>
                                                                         </Dialog>
-                                                                        <Toggle aria-label="Toggle bold">
-                                                                            <X color="white" onClick={() => {
-                                                                                completeEventForm.setValue('deposits', completeEventForm.watch('deposits')?.filter((_, i) => index !== i) ?? [])
-                                                                            }} />
-                                                                        </Toggle>
+                                                                        <Button size="sm" variant="outline" type="button" onClick={() => handleEditDeposit(deposit, index)}>
+                                                                            Editar
+                                                                        </Button>
+                                                                        <Button size="sm" variant="destructive" type="button" onClick={() => {
+                                                                            completeEventForm.setValue('deposits', completeEventForm.getValues('deposits')?.filter((_, i) => i !== index) ?? [])
+                                                                        }}>
+                                                                            Eliminar
+                                                                        </Button>
                                                                     </div>
                                                                 </div>
                                                             </Fragment>
@@ -2001,9 +2189,14 @@ return (
                                                     />
                                                 </div>
                                             </CardContent>
-                                            <CardFooter className="flex items-center justify-center">
+                                            <CardFooter className="flex items-center justify-center gap-3">
+                                                {editingProductOnDepositInfo !== null && (
+                                                    <Button variant={"ghost"} type="button" onClick={() => { setEditingProductOnDepositInfo(null); productOnDepositForm.reset() }}>
+                                                        Cancelar
+                                                    </Button>
+                                                )}
                                                 <Button variant={"outline"} type="submit">
-                                                    Agregar
+                                                    {editingProductOnDepositInfo !== null ? "Guardar cambios" : "Agregar"}
                                                 </Button>
                                             </CardFooter>
                                         </form>
@@ -2050,15 +2243,22 @@ return (
                                                                                                     <p>{prod.quantity}</p>
                                                                                                     <p>ud</p>
                                                                                                 </div>
-                                                                                                <Toggle aria-label="Toggle bold">
-                                                                                                    <X className="h-5 w-5" color="white" onClick={() => {
+                                                                                                <div className='flex gap-2'>
+                                                                                                    <DialogClose asChild>
+                                                                                                        <Button size="sm" variant="outline" type="button" onClick={() => handleEditProductOnDeposit(prod, index, pOnDepIndex)}>
+                                                                                                            Editar
+                                                                                                        </Button>
+                                                                                                    </DialogClose>
+                                                                                                    <Button size="sm" variant="destructive" type="button" onClick={() => {
                                                                                                         const depositsCorrected = completeEventForm.watch('deposits')
                                                                                                         if (depositsCorrected?.[index]?.productsOnDeposit) {
                                                                                                             depositsCorrected[index].productsOnDeposit = depositsCorrected[index]?.productsOnDeposit.filter((_, i) => pOnDepIndex !== i) ?? []
                                                                                                             completeEventForm.setValue('deposits', depositsCorrected)
                                                                                                         }
-                                                                                                    }} />
-                                                                                                </Toggle>
+                                                                                                    }}>
+                                                                                                        Eliminar
+                                                                                                    </Button>
+                                                                                                </div>
                                                                                             </div>
                                                                                         </div>
                                                                                     )
@@ -2255,9 +2455,14 @@ return (
                                                     />
                                                 </div>
                                             </CardContent>
-                                            <CardFooter className="flex items-center justify-center">
+                                            <CardFooter className="flex items-center justify-center gap-3">
+                                                {editingProductIndex !== null && (
+                                                    <Button variant="ghost" type="button" onClick={() => { setEditingProductIndex(null); productForm.reset() }}>
+                                                        Cancelar
+                                                    </Button>
+                                                )}
                                                 <Button variant={"outline"} type="submit">
-                                                    Agregar producto
+                                                    {editingProductIndex !== null ? "Guardar cambios" : "Agregar producto"}
                                                 </Button>
                                             </CardFooter>
                                         </form>
@@ -2290,8 +2495,14 @@ return (
                                                                     <div className='flex flex-1 gap-1 items-center justify-end'>
                                                                         <p>${prod.price.toLocaleString()}</p>
                                                                     </div>
+                                                                    <Button type="button" size="sm" variant="outline" onClick={() => {
+                                                                        setEditingProductIndex(index)
+                                                                        productForm.reset({ name: prod.name, price: prod.price, type: prod.type, about: prod.about ?? "", image: prod.image ?? "" })
+                                                                        setStep('PRODUCTS')
+                                                                    }}>Editar</Button>
                                                                     <Toggle aria-label="Toggle bold">
                                                                         <X className="h-5 w-5" color="white" onClick={() => {
+                                                                            if (editingProductIndex === index) { setEditingProductIndex(null); productForm.reset() }
                                                                             completeEventForm.setValue('products', completeEventForm.watch('products')?.filter((_, i) => index !== i))
                                                                             const deposits = completeEventForm.watch('deposits') ?? []
                                                                             deposits.map((dep, depIndex) => {

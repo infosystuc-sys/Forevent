@@ -13,7 +13,6 @@ export const eventRouter = createTRPCRouter({
   }),
 
   byId: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-    console.log("haydidi", input.id)
     const event = await ctx.prisma.event.findUnique({
       where: {
         id: input.id
@@ -53,6 +52,17 @@ export const eventRouter = createTRPCRouter({
               include: {
                 product: true
               }
+            },
+            counter: {
+              include: {
+                employeeOnEvent: {
+                  select: {
+                    userOnGuild: {
+                      select: { id: true }
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -67,6 +77,7 @@ export const eventRouter = createTRPCRouter({
               select: {
                 userOnGuild: {
                   select: {
+                    id: true,
                     user: {
                       select: {
                         id: true,
@@ -110,103 +121,43 @@ export const eventRouter = createTRPCRouter({
   eventSummary: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
     const { eventId } = input
 
-    const event = await ctx.prisma.event.findUnique({
-      where: {
-        id: input.eventId,
-        discharged: true
-      },
-      include: {
-        tickets: {
-          where: {
-            eventId: input.eventId
+    const [event, salesTotal, artists, postsCount, usersCount, countersCount, gatesCount, employeesOnGates] = await Promise.all([
+      ctx.prisma.event.findUnique({
+        where: { id: eventId, discharged: true },
+        include: {
+          tickets: {
+            where: { eventId },
+            select: { name: true, price: true, quantity: true },
           },
-          select: {
-            name: true,
-            price: true,
-            quantity: true,
-          }
         },
-      }
-    })
-
-    const salesTotal = await ctx.prisma.purchase.aggregate({
-      where: {
-        eventId: input.eventId
-      },
-      _sum: {
-        total: true
-      }
-    })
-
-    const artists = await ctx.prisma.artist.findMany({
-      where: {
-        eventId
-      },
-    })
-
-    const postsCount = await ctx.prisma.post.count({
-      where: {
-        discharged: true,
-      }
-    })
-
-    const usersCount = await ctx.prisma.userOnEvent.count({
-      where: {
-        eventId,
-        discharged: true
-      }
-    })
-
-    const employeesOnGates = await ctx.prisma.employeeOnEvent.findMany({
-      where: {
-        eventId,
-        gateId: { not: null },
-        counterId: null,
-        userOnGuild: {
-          discharged: true,
-        }
-      },
-      select: {
-        userOnGuildId: true,
-      }
-    })
+      }),
+      ctx.prisma.purchase.aggregate({
+        where: { eventId },
+        _sum: { total: true },
+      }),
+      ctx.prisma.artist.findMany({ where: { eventId } }),
+      ctx.prisma.post.count({ where: { eventId, discharged: true } }),
+      ctx.prisma.userOnEvent.count({ where: { eventId, discharged: true } }),
+      ctx.prisma.counter.count({ where: { eventId } }),
+      ctx.prisma.gate.count({ where: { eventId } }),
+      ctx.prisma.employeeOnEvent.findMany({
+        where: { eventId, gateId: { not: null }, counterId: null, userOnGuild: { discharged: true } },
+        select: { userOnGuildId: true },
+      }),
+    ])
 
     const employeesCount = await ctx.prisma.employeeOnEvent.count({
       where: {
         eventId,
-        userOnGuild: {
-          discharged: true,
-        },
-        NOT: employeesOnGates && employeesOnGates.length > 0 ? {
-          userOnGuildId: { "in": employeesOnGates.map(eog => eog.userOnGuildId ?? '') },
-          counterId: { not: null }
-        } : undefined
+        userOnGuild: { discharged: true },
+        NOT: employeesOnGates.length > 0 ? {
+          userOnGuildId: { in: employeesOnGates.map(eog => eog.userOnGuildId ?? '') },
+          counterId: { not: null },
+        } : undefined,
       },
     })
 
-    const countersCount = await ctx.prisma.counter.count({
-      where: {
-        eventId
-      }
-    })
-
-    const gatesCount = await ctx.prisma.gate.count({
-      where: {
-        eventId
-      }
-    })
-
-    return {
-      event,
-      salesTotal,
-      artists,
-      postsCount,
-      usersCount,
-      employeesCount,
-      countersCount,
-      gatesCount
-    }
-
+    return { event, salesTotal, artists, postsCount, usersCount, employeesCount, countersCount, gatesCount }
   }),
 
   countersAndGates: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
@@ -231,7 +182,6 @@ export const eventRouter = createTRPCRouter({
   }),
 
   counters: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
-    console.log('eventtt id', input.eventId)
     const event = await ctx.prisma.event.findUnique({
       where: {
         id: input.eventId
@@ -252,7 +202,6 @@ export const eventRouter = createTRPCRouter({
   }),
 
   gates: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
-    console.log('eventtt id', input.eventId)
     const event = await ctx.prisma.event.findUnique({
       where: {
         id: input.eventId
@@ -380,27 +329,31 @@ export const eventRouter = createTRPCRouter({
   }),
 
   byGuildId: publicProcedure.input(z.object({ guildId: z.string(), q: z.optional(z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'PAST'])) })).query(async ({ ctx, input }) => {
-    console.log("quer", input.q)
-
     const events = await ctx.prisma.event.findMany({
       where: {
         guildId: input.guildId,
+        discharged: true,
         status: input.q !== "PAST" ? input.q : undefined,
         endsAt: input.q === "PAST" ? { lte: new Date() } : undefined
       },
-      include: {
-        location: true,
-        artists: true,
-        tickets: {
-          include: {
-            _count: {
-              select: {
-                userTicket: true
-              }
-            },
+      select: {
+        id: true,
+        name: true,
+        image: true,
+        private: true,
+        status: true,
+        guildId: true,
+        startsAt: true,
+        endsAt: true,
+        location: {
+          select: {
+            address: true,
+            city: true,
+            country: true,
           }
         },
-      }
+      },
+      orderBy: { startsAt: 'desc' },
     })
     return events
   }),
@@ -422,7 +375,7 @@ export const eventRouter = createTRPCRouter({
       state: z.string().min(2, { message: "Este campo es requerido" }),
       city: z.string().min(2, { message: "Este campo es requerido" }),
       address: z.string().min(2, { message: "Este campo es requerido" }),
-      image: z.string().url().min(2, { message: "Este campo es requerido" }),
+      image: z.string().url().optional(),
     }),
     gates: z.array(
       z.object({
@@ -445,7 +398,7 @@ export const eventRouter = createTRPCRouter({
     artists: z.array(
       z.object({
         name: z.string(),
-        image: z.string().url()
+        image: z.string().url().optional()
       })
     ).optional(),
     deposits: z.array(
@@ -651,8 +604,216 @@ export const eventRouter = createTRPCRouter({
     })
   }),
 
-  update: protectedProcedure.input(CreatePostSchema).mutation(({ ctx, input }) => {
-    return
+  update: protectedProcedure.input(z.object({
+    eventId: z.string(),
+    guildId: z.string(),
+    name: z.string().min(2).optional(),
+    about: z.string().optional(),
+    startsAt: z.string().optional(),
+    endsAt: z.string().optional(),
+    "private": z.boolean().optional(),
+    image: z.string().url().optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const { eventId, guildId, startsAt, endsAt, ...rest } = input;
+
+    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
+      where: {
+        guildId,
+        user: { email: ctx.session.user.email ?? undefined },
+        discharged: true,
+      },
+    });
+    if (!userOnGuild) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para modificar este evento" });
+    }
+
+    return await ctx.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        ...rest,
+        ...(startsAt ? { startsAt: new Date(startsAt) } : {}),
+        ...(endsAt ? { endsAt: new Date(endsAt) } : {}),
+      },
+    });
+  }),
+
+  fullUpdate: protectedProcedure.input(z.object({
+    eventId: z.string(),
+    guildId: z.string(),
+    name: z.string().min(2),
+    about: z.string().min(2),
+    image: z.string().url().optional(),
+    startsAt: z.string(),
+    endsAt: z.string(),
+    "private": z.boolean(),
+    location: z.object({
+      id: z.string(),
+      name: z.string().min(2),
+      latitude: z.number(),
+      longitude: z.number(),
+      iana: z.string().min(2),
+      country: z.string().min(2),
+      state: z.string().min(2),
+      city: z.string().min(2),
+      address: z.string().min(2),
+      image: z.string().url().optional(),
+    }),
+    gates: z.array(z.object({
+      employees: z.array(z.string()),
+      name: z.string(),
+      about: z.string().optional(),
+    })),
+    tickets: z.array(z.object({
+      id: z.string().optional(),
+      name: z.string(),
+      price: z.number(),
+      quantity: z.number(),
+      about: z.string().optional(),
+      validUntil: z.string().optional(),
+    })),
+    artists: z.array(z.object({
+      name: z.string(),
+      image: z.string().url().optional(),
+    })).optional(),
+    deposits: z.array(z.object({
+      name: z.string(),
+      about: z.string().optional(),
+      counters: z.array(z.object({
+        employees: z.array(z.string()),
+        name: z.string(),
+        about: z.string().optional(),
+      })),
+      productsOnDeposit: z.array(z.object({
+        name: z.string(),
+        quantity: z.number().int(),
+      })),
+    })).optional(),
+    products: z.array(z.object({
+      id: z.string().optional(),
+      name: z.string(),
+      type: z.enum(["FOOD", "DRINK", "CONSUMABLE"]),
+      image: z.string().url(),
+      about: z.string().optional(),
+      price: z.number(),
+    })).optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const { eventId, guildId, startsAt, endsAt, location, gates, tickets, artists, deposits, products, ...eventFields } = input;
+
+    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
+      where: { guildId, user: { email: ctx.session.user.email ?? undefined }, discharged: true },
+    });
+    if (!userOnGuild) throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para modificar este evento" });
+
+    const parseUTC = (s: string): Date => new Date(s.length === 16 ? s + 'Z' : s);
+
+    return await ctx.prisma.$transaction(async (trans) => {
+      // 1. Update location
+      const { id: locationId, ...locationData } = location;
+      await trans.location.update({ where: { id: locationId }, data: locationData });
+
+      // 2. Update event fields
+      await trans.event.update({
+        where: { id: eventId },
+        data: { ...eventFields, startsAt: parseUTC(startsAt), endsAt: parseUTC(endsAt) },
+      });
+
+      // 3. Gates: delete employee assignments + gates, recreate
+      await trans.employeeOnEvent.deleteMany({ where: { eventId, gateId: { not: null } } });
+      await trans.gate.deleteMany({ where: { eventId } });
+
+      if (gates.length > 0) {
+        await trans.gate.createMany({ data: gates.map(g => ({ name: g.name, about: g.about, eventId })) });
+        const createdGates = await trans.gate.findMany({ where: { eventId } });
+        const gateEmployees: { eventId: string; userOnGuildId: string; gateId: string }[] = [];
+        createdGates.forEach(cg => {
+          const g = gates.find(x => x.name === cg.name);
+          g?.employees.forEach(empId => gateEmployees.push({ eventId, userOnGuildId: empId, gateId: cg.id }));
+        });
+        if (gateEmployees.length) await trans.employeeOnEvent.createMany({ data: gateEmployees });
+      }
+
+      // 4. Artists: delete all, recreate
+      await trans.artist.deleteMany({ where: { eventId } });
+      if (artists?.length) {
+        await trans.artist.createMany({ data: artists.map(a => ({ name: a.name, image: a.image, eventId })) });
+      }
+
+      // 5. Tickets: update existing, create new
+      await Promise.all(
+        tickets.filter(t => t.id).map(t =>
+          trans.ticket.update({
+            where: { id: t.id! },
+            data: {
+              name: t.name, price: t.price, quantity: t.quantity,
+              about: t.about ?? null,
+              validUntil: t.validUntil ? parseUTC(t.validUntil) : null,
+            },
+          })
+        )
+      );
+      const newTickets = tickets.filter(t => !t.id);
+      if (newTickets.length) {
+        await trans.ticket.createMany({
+          data: newTickets.map(t => ({
+            name: t.name, price: t.price, quantity: t.quantity,
+            about: t.about, eventId,
+            validUntil: t.validUntil ? parseUTC(t.validUntil) : undefined,
+          })),
+        });
+      }
+
+      // 6. Products: update existing, create new
+      await Promise.all(
+        (products ?? []).filter(p => p.id).map(p =>
+          trans.product.update({
+            where: { id: p.id! },
+            data: { name: p.name, type: p.type, image: p.image, about: p.about ?? null, price: p.price },
+          })
+        )
+      );
+      const newProducts = (products ?? []).filter(p => !p.id);
+      if (newProducts.length) {
+        await trans.product.createMany({ data: newProducts.map(({ id: _id, ...p }) => ({ ...p, eventId })) });
+      }
+
+      // 7. Deposits/Counters/ProductOnDeposit: delete all, recreate
+      await trans.employeeOnEvent.deleteMany({ where: { eventId, counterId: { not: null } } });
+      await trans.productOnDeposit.deleteMany({ where: { deposit: { eventId } } });
+      await trans.counter.deleteMany({ where: { eventId } });
+      await trans.deposit.deleteMany({ where: { eventId } });
+
+      if (deposits?.length) {
+        await trans.deposit.createMany({ data: deposits.map(d => ({ name: d.name, about: d.about, eventId })) });
+        const createdDeposits = await trans.deposit.findMany({ where: { eventId } });
+        const currentProducts = await trans.product.findMany({ where: { eventId } });
+
+        const counterData: { depositId: string; eventId: string; name: string; about?: string; employeesIds: string[] }[] = [];
+        const productOnDepositData: { depositId: string; productId: string; quantity: number }[] = [];
+
+        createdDeposits.forEach(cd => {
+          const d = deposits.find(x => x.name === cd.name);
+          d?.counters.forEach(c => counterData.push({ depositId: cd.id, eventId, name: c.name, about: c.about, employeesIds: c.employees }));
+          d?.productsOnDeposit.forEach(pod => {
+            const product = currentProducts.find(p => p.name === pod.name);
+            if (product) productOnDepositData.push({ depositId: cd.id, productId: product.id, quantity: pod.quantity });
+          });
+        });
+
+        if (counterData.length) {
+          await trans.counter.createMany({ data: counterData.map(({ employeesIds: _, ...c }) => c) });
+          const createdCounters = await trans.counter.findMany({ where: { eventId } });
+          const counterEmployees: { eventId: string; userOnGuildId: string; counterId: string }[] = [];
+          createdCounters.forEach(cc => {
+            const c = counterData.find(x => x.name === cc.name);
+            c?.employeesIds.forEach(empId => counterEmployees.push({ eventId, userOnGuildId: empId, counterId: cc.id }));
+          });
+          if (counterEmployees.length) await trans.employeeOnEvent.createMany({ data: counterEmployees });
+        }
+        if (productOnDepositData.length) await trans.productOnDeposit.createMany({ data: productOnDepositData });
+      }
+
+      return { id: eventId };
+    }, { maxWait: 10000, timeout: 10000 });
   }),
 
   updateStatus: protectedProcedure.input(z.object({
@@ -682,7 +843,23 @@ export const eventRouter = createTRPCRouter({
     });
   }),
 
-  "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
-    return
+  "delete": protectedProcedure.input(z.object({
+    eventId: z.string(),
+    guildId: z.string(),
+  })).mutation(async ({ ctx, input }) => {
+    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
+      where: {
+        guildId: input.guildId,
+        user: { email: ctx.session.user.email ?? undefined },
+        discharged: true,
+      },
+    });
+    if (!userOnGuild) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para eliminar este evento" });
+    }
+    return await ctx.prisma.event.update({
+      where: { id: input.eventId },
+      data: { discharged: false },
+    });
   }),
 });

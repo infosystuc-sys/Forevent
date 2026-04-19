@@ -6,9 +6,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "@forevent/ui/toast";
 
 const messages: Record<string, string> = {
-  created: "Evento creado",
-  updated: "Evento actualizado",
-  deleted: "Evento eliminado",
+  created: "Creado correctamente",
+  updated: "Actualizado correctamente",
+  deleted: "Dado de baja correctamente",
   published: "Evento publicado",
   paused: "Evento pausado",
 };

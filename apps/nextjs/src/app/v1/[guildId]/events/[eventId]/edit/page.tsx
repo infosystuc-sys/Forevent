@@ -5,16 +5,13 @@ import CreateEvent from "~/app/_components/admin/event/create"
 import { Icons } from "~/app/_components/ui/icons"
 import { api } from "~/trpc/react"
 
-export default function AdminEventEditPage() {
+export default function EditEventPage() {
     const params = useParams()
-    const eventId = params.id as string
+    const eventId = params.eventId as string
+    const guildId = params.guildId as string
 
     const event = api.web.event.byId.useQuery({ id: eventId })
-    const guildId = event.data?.guildId ?? ""
-    const employees = api.web.userOnGuild.getEmployees.useQuery(
-        { guildId },
-        { enabled: !!guildId }
-    )
+    const employees = api.web.userOnGuild.getEmployees.useQuery({ guildId })
 
     if (event.isLoading || employees.isLoading) {
         return (

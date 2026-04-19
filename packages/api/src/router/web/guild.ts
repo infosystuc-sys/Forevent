@@ -63,9 +63,6 @@ export const guildRouter = createTRPCRouter({
         }),
     ).query(async ({ ctx, input }) => {
         const email = input.email
-
-        console.log(email, "YEAH BUDDY GET GUILDS!")
-
         const guilds = await ctx.prisma.userOnGuild.findMany({
             where: {
                 user: { email: email },

@@ -5,6 +5,7 @@ import { Button } from "@forevent/ui/button";
 const navItems = [
   { label: "Inicio", href: "/admin" },
   { label: "Eventos", href: "/admin#eventos" },
+  { label: "Organizaciones", href: "/admin/organizations" },
   { label: "Finanzas", href: "/admin#finanzas" },
   { label: "Configuración", href: "/admin#configuracion" },
 ];

@@ -54,7 +54,7 @@ const EventCard = ({ item, back, like, menu, price, showData, style }: {
                         </View>
                     }
                     <View style={{ width: "100%", aspectRatio: 1 }}>
-                        <Image cachePolicy='memory-disk' placeholder={blurhash} priority='high' style={{ backgroundColor: colors.surface, width: '100%', aspectRatio: 1, borderBottomRightRadius: 75, borderTopLeftRadius: 75, zIndex: 0 }} source={{ uri: item.image ?? PLACEHOLDER }} />
+                        <Image cachePolicy='memory-disk' placeholder={blurhash} priority='high' contentFit="cover" style={{ backgroundColor: colors.surface, width: '100%', aspectRatio: 1, borderBottomRightRadius: 75, borderTopLeftRadius: 75, zIndex: 0 }} source={{ uri: item.image ?? PLACEHOLDER }} />
                         {showData &&
                             <LinearGradient start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.75 }} style={{ flex: 1, borderBottomRightRadius: 75, borderRadius: 0, zIndex: 2, position: "absolute", bottom: 0, width: "100%" }} colors={['transparent', 'rgba(11,11,11,0.8)']}>
                                 <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center', marginBottom: 25 }}>

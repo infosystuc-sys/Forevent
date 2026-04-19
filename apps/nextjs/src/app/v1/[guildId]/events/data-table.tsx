@@ -17,12 +17,11 @@ import {
 import * as React from "react"
 
 import type { ArrayElement, RouterOutputs } from "@forevent/api"
-import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { DataTablePagination } from "~/app/_components/table/pagination"
 import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/ui/avatar"
-import { buttonVariants } from "~/app/_components/ui/button"
 import { Input } from "~/app/_components/ui/input"
+import { Actions } from "./table-actions"
 import {
     Table,
     TableBody,
@@ -103,16 +102,7 @@ const columns: ColumnDef<ArrayElement<Awaited<RouterOutputs["web"]["event"]["byG
     },
     {
         id: "actions",
-        cell: ({ row }) => {
-            return (
-                <>
-                    {/*<Actions original={row.original} /> */}
-                    <Link href={`/v1/${row.original.guildId}/events/${row.original.id}`} className={buttonVariants({ variant: "outline" })}>
-                        Ver Evento
-                    </Link>
-                </>
-            )
-        },
+        cell: ({ row }) => <Actions original={row.original} />,
     },
 ]
 

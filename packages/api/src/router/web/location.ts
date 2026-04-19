@@ -5,9 +5,7 @@ import { TRPCError } from "@trpc/server";
 
 export const locationRouter = createTRPCRouter({
   all: protectedProcedure.input(z.object({ guildId: z.string() })).query(async ({ ctx, input }) => {
-      const locations = await ctx.prisma.location.findMany({ where: { event: { guildId: input.guildId } } })
-      console.log("first locations", locations)
-      return locations
+      return await ctx.prisma.location.findMany({ where: { event: { guildId: input.guildId } } })
     }),
 
   byId: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat, Poppins } from "next/font/google";
+import { Poppins } from "next/font/google";
 
 import { cn } from "@forevent/ui";
 import { ThemeProvider, ThemeToggle } from "@forevent/ui/theme";
@@ -11,15 +11,8 @@ import { TRPCReactProvider } from "~/trpc/react";
 import "~/app/globals.css";
 import AuthProvider from "./_components/auth/provider";
 
-const montserrat = Montserrat({
-  weight: ['100','200','300','400','500','600','700','800','900'],
-  style: ['normal', 'italic'],
-  subsets: ['latin'],
-  display: 'swap',
-})
-
 const poppins = Poppins({
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  weight: ['400', '500', '600', '700'],
   style: ['normal'],
   subsets: ['latin'],
   display: 'swap',
