@@ -13,6 +13,39 @@ const config = {
     "@forevent/ui",
     "@forevent/validators",
   ],
+  ...(process.env.NODE_ENV === "production" && {
+    compiler: {
+      removeConsole: { exclude: ["error", "warn"] },
+    },
+  }),
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "date-fns",
+      "dayjs",
+      "@radix-ui/react-icons",
+      "@radix-ui/react-accordion",
+      "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-avatar",
+      "@radix-ui/react-checkbox",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-hover-card",
+      "@radix-ui/react-label",
+      "@radix-ui/react-navigation-menu",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-radio-group",
+      "@radix-ui/react-scroll-area",
+      "@radix-ui/react-select",
+      "@radix-ui/react-separator",
+      "@radix-ui/react-slot",
+      "@radix-ui/react-switch",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-toast",
+      "@radix-ui/react-toggle",
+      "@radix-ui/react-tooltip",
+    ],
+  },
   webpack(webpackConfig) {
     // Suppress Watchpack "EINVAL: invalid argument" errors caused by Windows
     // system files (DumpStack.log, System Volume Information, etc.) that

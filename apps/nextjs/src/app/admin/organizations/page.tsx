@@ -1,10 +1,13 @@
 import db, { Status } from "@forevent/db"
 import { Button } from "@forevent/ui/button"
-import { PauseCircle, PlayCircle, PencilLine, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, PauseCircle, PlayCircle, PencilLine, Trash2 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import AdminToastListener from "../toast-listener"
 import { deleteOrganizationAction, permanentDeleteOrganizationAction, toggleOrganizationStatus } from "./actions"
 import DeleteOrganizationButton from "./delete-organization-button"
+
+const PAGE_SIZE = 20
 
 const statusClasses: Record<Status, string> = {
     [Status.ACCEPTED]: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20",
@@ -22,30 +25,42 @@ const statusLabels: Record<Status, string> = {
     [Status.REJECTED]: "Rechazada",
 }
 
-export default async function OrganizationsPage() {
-    const organizations = await db.guild.findMany({
-        orderBy: { name: "asc" },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            status: true,
-            discharged: true,
-            city: true,
-            state: true,
-            country: true,
-            commissionRate: true,
-            expiresAt: true,
-            userLimit: true,
-            _count: {
-                select: {
-                    events: true,
-                    usersOnGuild: true,
+export default async function OrganizationsPage({
+    searchParams,
+}: {
+    searchParams?: { page?: string }
+}) {
+    const page = Math.max(1, Number(searchParams?.page ?? "1") || 1)
+    const skip = (page - 1) * PAGE_SIZE
+    const [organizations, totalCount] = await Promise.all([
+        db.guild.findMany({
+            orderBy: { name: "asc" },
+            take: PAGE_SIZE,
+            skip,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                status: true,
+                discharged: true,
+                city: true,
+                state: true,
+                country: true,
+                commissionRate: true,
+                expiresAt: true,
+                userLimit: true,
+                _count: {
+                    select: {
+                        events: true,
+                        usersOnGuild: true,
+                    },
                 },
             },
-        },
-    })
+        }),
+        db.guild.count(),
+    ])
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
     return (
         <div className="flex flex-col gap-8">
@@ -70,7 +85,7 @@ export default async function OrganizationsPage() {
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold">
                         Organizaciones{" "}
-                        <span className="text-sm font-normal text-muted-foreground">({organizations.length})</span>
+                        <span className="text-sm font-normal text-muted-foreground">({totalCount})</span>
                     </h2>
                 </div>
 
@@ -96,9 +111,9 @@ export default async function OrganizationsPage() {
                                 className={`flex flex-col gap-4 rounded-xl border bg-card p-5 shadow-sm md:flex-row md:items-center md:justify-between ${!isAlive ? "opacity-60" : ""}`}
                             >
                                 <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-muted">
+                                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-muted">
                                         {org.image ? (
-                                            <img src={org.image} alt={org.name} className="h-12 w-12 object-cover" />
+                                            <Image src={org.image} alt={org.name} fill sizes="48px" className="object-cover" />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-sm font-bold text-muted-foreground">
                                                 {org.name.slice(0, 2).toUpperCase()}
@@ -163,6 +178,32 @@ export default async function OrganizationsPage() {
                         )
                     })}
                 </div>
+
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2">
+                        <p className="text-xs text-muted-foreground">Página {page} de {totalPages}</p>
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" disabled={page <= 1} asChild={page > 1}>
+                                {page > 1 ? (
+                                    <Link href={`/admin/organizations?page=${page - 1}`}>
+                                        <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+                                    </Link>
+                                ) : (
+                                    <span><ChevronLeft className="mr-1 h-4 w-4" /> Anterior</span>
+                                )}
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={page >= totalPages} asChild={page < totalPages}>
+                                {page < totalPages ? (
+                                    <Link href={`/admin/organizations?page=${page + 1}`}>
+                                        Siguiente <ChevronRight className="ml-1 h-4 w-4" />
+                                    </Link>
+                                ) : (
+                                    <span>Siguiente <ChevronRight className="ml-1 h-4 w-4" /></span>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </section>
         </div>
     )

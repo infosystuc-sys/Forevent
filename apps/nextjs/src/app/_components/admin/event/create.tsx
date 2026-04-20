@@ -2,8 +2,6 @@
 
 import type { ArrayElement, RouterOutputs } from "@forevent/api"
 import { zodResolver } from "@hookform/resolvers/zod"
-import type { Libraries } from "@react-google-maps/api";
-import { GoogleMap, Marker, StandaloneSearchBox, useLoadScript } from "@react-google-maps/api"
 import type {
     ColumnDef,
     ColumnFiltersState,
@@ -21,8 +19,9 @@ import {
     useReactTable
 } from "@tanstack/react-table"
 import { Container, DoorOpen, MapPinned, Mic2, Package, Pizza, SquarePen, Ticket, Warehouse, X } from "lucide-react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
-import { Fragment, useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { CountryDropdown, RegionDropdown } from "react-country-region-selector"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -76,6 +75,16 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Textarea } from "../../ui/textarea"
 import { Toggle } from "../../ui/toggle"
 import { Nav } from "./nav"
+
+const LocationMap = dynamic(() => import("./location-map"), {
+    ssr: false,
+    loading: () => (
+        <div className="flex flex-1 items-center justify-center py-8">
+            <Icons.spinner className="mr-2 h-10 w-10 animate-spin" />
+            <span className="text-sm text-muted-foreground">Cargando mapa...</span>
+        </div>
+    ),
+})
 
 const employeesColumns: ColumnDef<ArrayElement<RouterOutputs["web"]["userOnGuild"]["getEmployees"]>>[] = [
     {
@@ -242,168 +251,6 @@ const productOnDepositSchema = z.object({
     quantity: z.coerce.number().int()
 })
 
-const mapStyle = [
-    {
-        elementType: "geometry",
-        stylers: [
-            {
-                color: "#242f3e"
-            }
-        ]
-    },
-    {
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#746855"
-            }
-        ]
-    },
-    {
-        elementType: "labels.text.stroke",
-        stylers: [
-            {
-                color: "#242f3e"
-            }
-        ]
-    },
-    {
-        featureType: "administrative.locality",
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#d59563"
-            }
-        ]
-    },
-    {
-        featureType: "poi",
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#d59563"
-            }
-        ]
-    },
-    {
-        featureType: "poi.park",
-        elementType: "geometry",
-        stylers: [
-            {
-                color: "#263c3f"
-            }
-        ]
-    },
-    {
-        featureType: "poi.park",
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#6b9a76"
-            }
-        ]
-    },
-    {
-        featureType: "road",
-        elementType: "geometry",
-        stylers: [
-            {
-                color: "#38414e"
-            }
-        ]
-    },
-    {
-        featureType: "road",
-        elementType: "geometry.stroke",
-        stylers: [
-            {
-                color: "#212a37"
-            }
-        ]
-    },
-    {
-        featureType: "road",
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#9ca5b3"
-            }
-        ]
-    },
-    {
-        featureType: "road.highway",
-        elementType: "geometry",
-        stylers: [
-            {
-                color: "#746855"
-            }
-        ]
-    },
-    {
-        featureType: "road.highway",
-        elementType: "geometry.stroke",
-        stylers: [
-            {
-                color: "#1f2835"
-            }
-        ]
-    },
-    {
-        featureType: "road.highway",
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#f3d19c"
-            }
-        ]
-    },
-    {
-        featureType: "transit",
-        elementType: "geometry",
-        stylers: [
-            {
-                color: "#2f3948"
-            }
-        ]
-    },
-    {
-        featureType: "transit.station",
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#d59563"
-            }
-        ]
-    },
-    {
-        featureType: "water",
-        elementType: "geometry",
-        stylers: [
-            {
-                color: "#17263c"
-            }
-        ]
-    },
-    {
-        featureType: "water",
-        elementType: "labels.text.fill",
-        stylers: [
-            {
-                color: "#515c6d"
-            }
-        ]
-    },
-    {
-        featureType: "water",
-        elementType: "labels.text.stroke",
-        stylers: [
-            {
-                color: "#17263c"
-            }
-        ]
-    }
-]
-
 interface LocationSearch {
     street_number?: string,
     route?: string,
@@ -413,8 +260,6 @@ interface LocationSearch {
     postal_code?: string,
 }
 
-const libraries: Libraries = ["places"]
-
 export default function CreateEvent({ guildId, employees, initialEvent, eventId }: { guildId: string, employees: RouterOutputs['web']['userOnGuild']['getEmployees'], initialEvent?: RouterOutputs['web']['event']['byId'], eventId?: string }) {
     const route = useRouter()
     const utils = api.useUtils()
@@ -422,7 +267,7 @@ export default function CreateEvent({ guildId, employees, initialEvent, eventId 
     const [step, setStep] = useState<'DETAILS' | 'GATES' | 'LOCATION' | 'TICKETS' | 'DEPOSITS' | 'PRODUCTS' | 'ARTISTS' | 'COUNTERS' | 'PRODUCTSONDEPOSIT'>('DETAILS')
     const [searchBox, setSearchBox] = useState<google.maps.places.SearchBox | null>(null);
     const [locationId, setLocationId] = useState<string | undefined>(undefined)
-    const mapRef = useRef<GoogleMap>(null)
+    const [mapLoadError, setMapLoadError] = useState(false)
 
     const getEmployees = api.web.userOnGuild.getEmployees.useQuery({ guildId }, {
         initialData: employees
@@ -859,10 +704,6 @@ export default function CreateEvent({ guildId, employees, initialEvent, eventId 
     }, [initialEvent])
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ""
-    const { isLoaded, loadError } = useLoadScript({
-        googleMapsApiKey,
-        libraries,
-    })
 
     const onPlacesChanged = () => {
         const place = searchBox?.getPlaces()![0]!
@@ -953,7 +794,7 @@ return (
                                 toast.error("Falta la clave de Google Maps. Añade NEXT_PUBLIC_GOOGLE_MAPS_API_KEY en .env")
                                 return
                             }
-                            if (loadError) {
+                            if (mapLoadError) {
                                 toast.error("El mapa no pudo cargar. Verifica la API key y que Maps JavaScript API y Places API estén habilitados en Google Cloud Console.")
                                 return
                             }
@@ -1150,16 +991,6 @@ return (
                                             <p className="text-destructive font-medium">Falta la clave de Google Maps</p>
                                             <p className="text-muted-foreground text-sm text-center max-w-md">Añade <code className="bg-muted px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> en tu archivo <code className="bg-muted px-1 rounded">.env</code>.</p>
                                         </CardContent>
-                                    ) : loadError ? (
-                                        <CardContent className="flex flex-1 flex-col items-center justify-center gap-2 py-8">
-                                            <p className="text-destructive font-medium">El mapa no pudo cargar</p>
-                                            <p className="text-muted-foreground text-sm text-center max-w-md">Verifica la API key y que Maps JavaScript API y Places API estén habilitados.</p>
-                                        </CardContent>
-                                    ) : !isLoaded ? (
-                                        <div className="flex flex-1 items-center justify-center py-8">
-                                            <Icons.spinner className="mr-2 h-10 w-10 animate-spin" />
-                                            <span className="text-sm text-muted-foreground">Cargando mapa...</span>
-                                        </div>
                                     ) : (
                                         <>
                                             <CardHeader className="mb-0 pb-2">
@@ -1173,38 +1004,25 @@ return (
                                                             <FormField control={searchForm.control} name="search" render={({ field }) => (
                                                                 <FormItem {...field} className="pb-2">
                                                                     <FormLabel>Búsqueda</FormLabel>
-                                                                    <FormControl>
-                                                                        <StandaloneSearchBox onPlacesChanged={onPlacesChanged} onLoad={onSearchBoxLoad}>
-                                                                            <Input type="text" placeholder="Buscar dirección en Google Maps" {...field} />
-                                                                        </StandaloneSearchBox>
-                                                                    </FormControl>
+                                                                    {step === "LOCATION" ? (
+                                                                        <LocationMap
+                                                                            apiKey={googleMapsApiKey}
+                                                                            coords={coords}
+                                                                            markerPosition={completeEventForm.watch("location.latitude") != null && completeEventForm.watch("location.longitude") != null ? { lat: completeEventForm.watch("location.latitude")!, lng: completeEventForm.watch("location.longitude")! } : null}
+                                                                            onMapClick={(lat, lng) => {
+                                                                                setCoords({ lat, lng })
+                                                                                completeEventForm.setValue("location.latitude", lat)
+                                                                                completeEventForm.setValue("location.longitude", lng)
+                                                                            }}
+                                                                            onPlacesChanged={onPlacesChanged}
+                                                                            onSearchBoxLoad={onSearchBoxLoad}
+                                                                            onLoadError={setMapLoadError}
+                                                                            searchInput={<Input type="text" placeholder="Buscar dirección en Google Maps" {...field} />}
+                                                                        />
+                                                                    ) : null}
                                                                     <FormMessage />
                                                                 </FormItem>
                                                             )} />
-                                                            <div className="w-full h-[30vh]">
-                                                                {step === "LOCATION" && (
-                                                                    <GoogleMap
-                                                                        options={{ backgroundColor: "#222", fullscreenControl: false, streetViewControl: false, mapTypeControl: false, styles: mapStyle, center: coords }}
-                                                                        onClick={(e: google.maps.MapMouseEvent) => {
-                                                                            const latLng = e.latLng
-                                                                            if (!latLng) return
-                                                                            const lat = typeof latLng.lat === "function" ? latLng.lat() : latLng.lat
-                                                                            const lng = typeof latLng.lng === "function" ? latLng.lng() : latLng.lng
-                                                                            setCoords({ lat, lng })
-                                                                            completeEventForm.setValue("location.latitude", lat)
-                                                                            completeEventForm.setValue("location.longitude", lng)
-                                                                        }}
-                                                                        zoom={15}
-                                                                        center={coords}
-                                                                        ref={mapRef}
-                                                                        mapContainerClassName="w-full h-full"
-                                                                    >
-                                                                        {completeEventForm.watch("location.latitude") != null && completeEventForm.watch("location.longitude") != null && (
-                                                                            <Marker position={{ lat: completeEventForm.watch("location.latitude")!, lng: completeEventForm.watch("location.longitude")! }} />
-                                                                        )}
-                                                                    </GoogleMap>
-                                                                )}
-                                                            </div>
                                                         </form>
                                                     </Form>
                                                 </div>

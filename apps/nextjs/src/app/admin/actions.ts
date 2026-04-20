@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import db, { Status } from "@forevent/db";
@@ -12,11 +12,14 @@ export async function toggleEventStatus(
   const nextStatus =
     currentStatus === Status.DRAFT ? Status.ACCEPTED : Status.DRAFT;
 
-  await db.event.update({
+  const updated = await db.event.update({
     where: { id: eventId },
     data: { status: nextStatus },
+    select: { guildId: true },
   });
 
+  revalidateTag("admin-dashboard");
+  if (updated?.guildId) revalidateTag(`guild-${updated.guildId}`);
   revalidatePath("/admin");
   redirect(
     `/admin?toast=${nextStatus === Status.ACCEPTED ? "published" : "paused"}`,

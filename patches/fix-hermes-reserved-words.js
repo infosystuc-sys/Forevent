@@ -36,9 +36,14 @@ const QUICK_RE = /\b(async|default|in|delete|private|public|for|of|new|class|typ
 let fixedFiles = 0;
 let scannedFiles = 0;
 let skippedQuick = 0;
+let lastLog = Date.now();
 
 function fixFile(filePath) {
   scannedFiles++;
+  if (Date.now() - lastLog > 5000) {
+    process.stdout.write('[fix-hermes] scanned=' + scannedFiles + ' fixed=' + fixedFiles + '\n');
+    lastLog = Date.now();
+  }
   let src;
   try { src = fs.readFileSync(filePath, 'utf8'); } catch(e) { return; }
 

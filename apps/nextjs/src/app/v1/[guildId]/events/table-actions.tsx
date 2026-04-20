@@ -22,7 +22,7 @@ import {
 } from "~/app/_components/ui/dropdown-menu";
 import { api } from "~/trpc/react";
 
-export function Actions({ original }: { original: ArrayElement<Awaited<RouterOutputs["web"]["event"]["byGuildId"]>> }) {
+export function Actions({ original }: { original: ArrayElement<Awaited<RouterOutputs["web"]["event"]["byGuildId"]>["rows"]> }) {
     const [deleteOpen, setDeleteOpen] = useState(false);
     const router = useRouter();
     const utils = api.useUtils();

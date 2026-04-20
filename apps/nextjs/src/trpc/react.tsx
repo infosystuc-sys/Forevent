@@ -11,7 +11,20 @@ import type { AppRouter } from "@forevent/api";
 export const api = createTRPCReact<AppRouter>();
 
 export function TRPCReactProvider(props: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 30_000,
+            gcTime: 5 * 60_000,
+            refetchOnWindowFocus: false,
+            refetchOnReconnect: false,
+            retry: 1,
+          },
+        },
+      }),
+  );
 
   const [trpcClient] = useState(() =>
     api.createClient({

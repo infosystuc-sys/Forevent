@@ -132,7 +132,9 @@
       "Bash(./gradlew assembleDebug -PreactNativeDevServerPort=8082 --no-daemon)",
       "Bash(ls -la d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/expo/android/app/build/outputs/apk/debug/*.apk)",
       "Bash(adb install:*)",
-      "Bash(node ../../scripts/with-env.js echo \"with-env works\")"
+      "Bash(node ../../scripts/with-env.js echo \"with-env works\")",
+      "Bash(sed -n '252,425p' d:/FOREVENT2026/ForeventKonTechDev2025nicoonline/apps/nextjs/src/app/_components/admin/event/create.tsx)",
+      "Read(//tmp/**)"
     ],
     "additionalDirectories": [
       "d:\\FOREVENT2026\\ForeventKonTechDev2025nicoonline\\apps\\expo\\src\\app\\(app)\\home\\ticket\\purchase"

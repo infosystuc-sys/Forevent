@@ -12,6 +12,57 @@ export const eventRouter = createTRPCRouter({
     return
   }),
 
+  adminDetail: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const event = await ctx.prisma.event.findUnique({
+      where: { id: input.id },
+      select: {
+        id: true,
+        name: true,
+        about: true,
+        image: true,
+        status: true,
+        startsAt: true,
+        endsAt: true,
+        location: { select: { name: true, address: true } },
+        tickets: {
+          select: { id: true, name: true, about: true, price: true, quantity: true, validUntil: true },
+        },
+        products: {
+          select: { id: true, name: true, about: true, image: true, price: true, type: true },
+        },
+        gates: {
+          select: {
+            id: true,
+            name: true,
+            about: true,
+            _count: { select: { employeeOnEvent: true } },
+          },
+        },
+        artists: { select: { id: true, name: true, image: true } },
+        deposits: {
+          select: {
+            id: true,
+            name: true,
+            about: true,
+            productsOnDeposit: {
+              select: {
+                quantity: true,
+                product: { select: { name: true } },
+              },
+            },
+            counter: { select: { id: true, name: true, about: true } },
+          },
+        },
+      },
+    })
+
+    if (!event) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Event not found" })
+    }
+
+    return event
+  }),
+
   byId: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     const event = await ctx.prisma.event.findUnique({
       where: {
@@ -328,34 +379,46 @@ export const eventRouter = createTRPCRouter({
     })
   }),
 
-  byGuildId: publicProcedure.input(z.object({ guildId: z.string(), q: z.optional(z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'PAST'])) })).query(async ({ ctx, input }) => {
-    const events = await ctx.prisma.event.findMany({
-      where: {
-        guildId: input.guildId,
-        discharged: true,
-        status: input.q !== "PAST" ? input.q : undefined,
-        endsAt: input.q === "PAST" ? { lte: new Date() } : undefined
-      },
-      select: {
-        id: true,
-        name: true,
-        image: true,
-        private: true,
-        status: true,
-        guildId: true,
-        startsAt: true,
-        endsAt: true,
-        location: {
-          select: {
-            address: true,
-            city: true,
-            country: true,
-          }
+  byGuildId: publicProcedure.input(z.object({
+    guildId: z.string(),
+    q: z.optional(z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'PAST'])),
+    page: z.number().int().min(1).default(1),
+    pageSize: z.number().int().min(1).max(100).default(20),
+  })).query(async ({ ctx, input }) => {
+    const { guildId, q, page, pageSize } = input
+    const where = {
+      guildId,
+      discharged: true,
+      status: q !== "PAST" ? q : undefined,
+      endsAt: q === "PAST" ? { lte: new Date() } : undefined,
+    }
+    const [rows, total] = await Promise.all([
+      ctx.prisma.event.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          private: true,
+          status: true,
+          guildId: true,
+          startsAt: true,
+          endsAt: true,
+          location: {
+            select: {
+              address: true,
+              city: true,
+              country: true,
+            }
+          },
         },
-      },
-      orderBy: { startsAt: 'desc' },
-    })
-    return events
+        orderBy: { startsAt: 'desc' },
+        take: pageSize,
+        skip: (page - 1) * pageSize,
+      }),
+      ctx.prisma.event.count({ where }),
+    ])
+    return { rows, total, page, pageSize }
   }),
 
   create: protectedProcedure.input(z.object({
@@ -741,7 +804,7 @@ export const eventRouter = createTRPCRouter({
       // 5. Tickets: update existing, create new
       await Promise.all(
         tickets.filter(t => t.id).map(t =>
-          trans.ticket.update({
+          trans.eventTicket.update({
             where: { id: t.id! },
             data: {
               name: t.name, price: t.price, quantity: t.quantity,
@@ -753,7 +816,7 @@ export const eventRouter = createTRPCRouter({
       );
       const newTickets = tickets.filter(t => !t.id);
       if (newTickets.length) {
-        await trans.ticket.createMany({
+        await trans.eventTicket.createMany({
           data: newTickets.map(t => ({
             name: t.name, price: t.price, quantity: t.quantity,
             about: t.about, eventId,

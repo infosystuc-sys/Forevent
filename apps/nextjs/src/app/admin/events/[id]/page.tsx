@@ -1,14 +1,12 @@
-"use client"
-
-import { useParams, useRouter } from "next/navigation"
-import { Icons } from "~/app/_components/ui/icons"
-import { api } from "~/trpc/react"
+import { ArrowLeft, MapPin, Calendar, Ticket, Package, DoorOpen, Mic2, Container, Building2 } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/ui/avatar"
 import { Badge } from "~/app/_components/ui/badge"
 import { Button } from "~/app/_components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "~/app/_components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/ui/avatar"
-import { ArrowLeft, MapPin, Calendar, Ticket, Package, DoorOpen, Mic2, Container, Building2 } from "lucide-react"
 import { customdayjs } from "~/lib/constants"
+import { api } from "~/trpc/server"
 
 const statusLabel: Record<string, string> = {
     ACCEPTED: "Publicado",
@@ -24,20 +22,8 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
     REJECTED: "destructive",
 }
 
-export default function AdminEventDetailPage() {
-    const params = useParams()
-    const router = useRouter()
-    const eventId = params.id as string
-
-    const { data: event, isLoading } = api.web.event.byId.useQuery({ id: eventId })
-
-    if (isLoading) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <Icons.spinner className="h-8 w-8 animate-spin" />
-            </div>
-        )
-    }
+export default async function AdminEventDetailPage({ params }: { params: { id: string } }) {
+    const event = await api.web.event.adminDetail({ id: params.id }).catch(() => null)
 
     if (!event) {
         return <p className="p-8 text-muted-foreground">Evento no encontrado.</p>
@@ -48,9 +34,11 @@ export default function AdminEventDetailPage() {
     return (
         <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="sm" onClick={() => router.back()}>
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Volver
+                <Button variant="ghost" size="sm" asChild>
+                    <Link href="/admin">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Volver
+                    </Link>
                 </Button>
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
@@ -63,52 +51,62 @@ export default function AdminEventDetailPage() {
                         <p className="mt-1 text-sm text-muted-foreground">{event.about}</p>
                     )}
                 </div>
-                <Button variant="outline" onClick={() => router.push(`/admin/events/${eventId}/edit`)}>
-                    Editar evento
+                <Button variant="outline" asChild>
+                    <Link href={`/admin/events/${event.id}/edit`}>Editar evento</Link>
                 </Button>
             </div>
 
-            {event.image && (
-                <div className="overflow-hidden rounded-xl border">
-                    <img src={event.image} alt={event.name} className="h-64 w-full object-contain bg-black" />
+            {/* Imagen + Fecha/Ubicación en dos mitades */}
+            <div className="grid grid-cols-1 overflow-hidden rounded-xl border md:grid-cols-2">
+                {/* Mitad izquierda — imagen */}
+                <div className="relative flex h-64 items-center justify-center bg-black">
+                    {event.image ? (
+                        <Image src={event.image} alt={event.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-contain" />
+                    ) : (
+                        <div className="flex h-64 w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+                            Sin imagen
+                        </div>
+                    )}
                 </div>
-            )}
 
-            {/* Fecha y ubicación */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                {/* Mitad derecha — fecha y ubicación */}
+                <div className="flex flex-col justify-center gap-6 bg-card p-6">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                             <Calendar className="h-4 w-4" />
                             Fecha y hora
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1">
-                        <p className="text-sm"><span className="font-medium">Inicio:</span> {customdayjs(event.startsAt).format("DD/MM/YYYY HH:mm")}</p>
+                        </div>
+                        <p className="text-sm">
+                            <span className="font-medium">Inicio:</span>{" "}
+                            {customdayjs(event.startsAt).format("DD/MM/YYYY HH:mm")}
+                        </p>
                         {event.endsAt && (
-                            <p className="text-sm"><span className="font-medium">Fin:</span> {customdayjs(event.endsAt).format("DD/MM/YYYY HH:mm")}</p>
+                            <p className="text-sm">
+                                <span className="font-medium">Fin:</span>{" "}
+                                {customdayjs(event.endsAt).format("DD/MM/YYYY HH:mm")}
+                            </p>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
 
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <div className="h-px bg-border" />
+
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                             <MapPin className="h-4 w-4" />
                             Ubicación
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1">
+                        </div>
                         {event.location ? (
                             <>
-                                {event.location.name && <p className="text-sm font-medium">{event.location.name}</p>}
+                                {event.location.name && (
+                                    <p className="text-sm font-medium">{event.location.name}</p>
+                                )}
                                 <p className="text-sm text-muted-foreground">{event.location.address}</p>
                             </>
                         ) : (
                             <p className="text-sm text-muted-foreground">Sin ubicación asignada</p>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
 
             {/* Tickets */}
@@ -123,8 +121,8 @@ export default function AdminEventDetailPage() {
                 <CardContent>
                     {event.tickets && event.tickets.length > 0 ? (
                         <div className="space-y-3">
-                            {event.tickets.map((ticket, i) => (
-                                <div key={i} className="flex items-center justify-between rounded-lg border p-3">
+                            {event.tickets.map((ticket) => (
+                                <div key={ticket.id} className="flex items-center justify-between rounded-lg border p-3">
                                     <div>
                                         <p className="font-medium">{ticket.name}</p>
                                         {ticket.about && <p className="text-sm text-muted-foreground">{ticket.about}</p>}
@@ -157,8 +155,8 @@ export default function AdminEventDetailPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {event.products.map((product, i) => (
-                                <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
+                            {event.products.map((product) => (
+                                <div key={product.id} className="flex items-center gap-3 rounded-lg border p-3">
                                     <Avatar className="h-10 w-10 rounded-md">
                                         <AvatarImage src={product.image ?? ""} />
                                         <AvatarFallback className="rounded-md">{product.name[0]}</AvatarFallback>
@@ -188,11 +186,11 @@ export default function AdminEventDetailPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {event.gates.map((gate, i) => (
-                                <div key={i} className="rounded-lg border p-3">
+                            {event.gates.map((gate) => (
+                                <div key={gate.id} className="rounded-lg border p-3">
                                     <p className="font-medium">{gate.name}</p>
                                     {gate.about && <p className="text-sm text-muted-foreground">{gate.about}</p>}
-                                    <p className="mt-1 text-xs text-muted-foreground">{gate.employeeOnEvent?.length ?? 0} empleados asignados</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">{gate._count.employeeOnEvent} empleados asignados</p>
                                 </div>
                             ))}
                         </div>
@@ -212,8 +210,8 @@ export default function AdminEventDetailPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-3">
-                            {event.artists.map((artist, i) => (
-                                <div key={i} className="flex items-center gap-2 rounded-lg border p-3">
+                            {event.artists.map((artist) => (
+                                <div key={artist.id} className="flex items-center gap-2 rounded-lg border p-3">
                                     <Avatar className="h-8 w-8">
                                         <AvatarImage src={artist.image ?? ""} />
                                         <AvatarFallback>{artist.name[0]}</AvatarFallback>
@@ -237,8 +235,8 @@ export default function AdminEventDetailPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {event.deposits.map((deposit, i) => (
-                            <div key={i} className="rounded-lg border p-4 space-y-3">
+                        {event.deposits.map((deposit) => (
+                            <div key={deposit.id} className="rounded-lg border p-4 space-y-3">
                                 <div>
                                     <p className="font-medium">{deposit.name}</p>
                                     {deposit.about && <p className="text-sm text-muted-foreground">{deposit.about}</p>}
@@ -262,8 +260,8 @@ export default function AdminEventDetailPage() {
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground mb-2">Mostradores</p>
                                         <div className="space-y-1">
-                                            {deposit.counter.map((counter, j) => (
-                                                <div key={j} className="flex items-center gap-2 text-sm px-2 py-1 rounded bg-muted/40">
+                                            {deposit.counter.map((counter) => (
+                                                <div key={counter.id} className="flex items-center gap-2 text-sm px-2 py-1 rounded bg-muted/40">
                                                     <Building2 className="h-3 w-3 text-muted-foreground" />
                                                     <span>{counter.name}</span>
                                                     {counter.about && <span className="text-muted-foreground">— {counter.about}</span>}

@@ -250,119 +250,116 @@ export const guildRouter = createTRPCRouter({
         })
     ).query(async ({ ctx, input }) => {
         const { guildId } = input
+        const now = new Date()
 
-        const employeeCount = await ctx.prisma.userOnGuild.count({
-            where: {
-                guildId,
-                discharged: true,
-                status: "ACCEPTED"
-            },
-        })
+        const [employeeCount, pendingEvents, pastEvents, approvedEvents, rejectedEvents] =
+            await Promise.all([
+                ctx.prisma.userOnGuild.count({
+                    where: { guildId, discharged: true, status: "ACCEPTED" },
+                }),
+                ctx.prisma.event.count({ where: { guildId, status: "PENDING" } }),
+                ctx.prisma.event.count({ where: { guildId, endsAt: { lt: now } } }),
+                ctx.prisma.event.count({ where: { guildId, status: "ACCEPTED" } }),
+                ctx.prisma.event.count({ where: { guildId, status: "REJECTED" } }),
+            ])
 
-        const guildEvents = await ctx.prisma.guild.findUnique({
-            where: {
-                id: input.guildId
-            },
-            select: {
-                events: true
-            }
-        })
-
-        // pendingEvents, pastEvents, approvedEvents, rejectedEvents
         return {
             employeeCount,
-            pendingEvents: guildEvents?.events.filter((event) => event.status === "PENDING").length,
-            pastEvents: guildEvents?.events.filter((event) => event.endsAt < new Date()).length,
-            approvedEvents: guildEvents?.events.filter((event) => event.status === "ACCEPTED").length,
-            rejectedEvents: guildEvents?.events.filter((event) => event.status === "REJECTED").length
+            pendingEvents,
+            pastEvents,
+            approvedEvents,
+            rejectedEvents,
         }
-
     }),
 
     getGuildSales: protectedProcedure.input(z.object({
         guildId: z.string()
     })).query(async ({ ctx, input }) => {
-        //getGuildSales
+        const { guildId } = input
 
-        const guildSales = await ctx.prisma.guild.findUnique({
-            where: {
-                id: input.guildId
-            },
-            select: {
-                events: {
+        const [totalAgg, eventTotalsAgg, events, productItemGroups, ticketItemGroups] =
+            await Promise.all([
+                ctx.prisma.purchase.aggregate({
+                    _sum: { total: true },
+                    where: { event: { guildId } },
+                }),
+                ctx.prisma.purchase.groupBy({
+                    by: ["eventId"],
+                    _sum: { total: true },
+                    where: { event: { guildId }, eventId: { not: null } },
+                }),
+                ctx.prisma.event.findMany({
+                    where: { guildId },
+                    select: { id: true, name: true, image: true },
+                }),
+                ctx.prisma.itemOnPurchase.groupBy({
+                    by: ["productId"],
                     where: {
-                        guildId: input.guildId
+                        productId: { not: null },
+                        purchase: { event: { guildId } },
                     },
-                    select: {
-                        purchases: {
-                            select: {
-                                total: true,
-                                id: true,
-                                items: {
-                                    select: {
-                                        quantity: true,
-                                        product: {
-                                            select: {
-                                                price: true,
-                                            }
-                                        },
-                                        eventTicket: {
-                                            select: {
-                                                price: true
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        name: true,
-                        image: true,
-                        id: true,
+                    _sum: { quantity: true },
+                }),
+                ctx.prisma.itemOnPurchase.groupBy({
+                    by: ["eventTicketId"],
+                    where: {
+                        eventTicketId: { not: null },
+                        purchase: { event: { guildId } },
                     },
-                },
-            }
-        })
+                    _sum: { quantity: true },
+                }),
+            ])
 
-        let totalGuildSales: number = 0
-        const eventsTotals: { name: string, total: number, image: string, eventId: string }[] = []
-        let productsSales: number = 0
-        let ticketsSales: number = 0
+        const productIds = productItemGroups
+            .map((g) => g.productId)
+            .filter((id): id is string => id !== null)
+        const ticketIds = ticketItemGroups
+            .map((g) => g.eventTicketId)
+            .filter((id): id is string => id !== null)
 
-        guildSales?.events.forEach(event => {
-            // sumo los totales de los eventos
-            event.purchases.forEach(eventPurchase => {
-                totalGuildSales += eventPurchase.total ?? 0
-                // ciclo para sumar las ventas en tickets y en productos (por item)
-                eventPurchase.items.forEach(item => {
-                    // si tiene un producto, acumula el precio final de ese item (precio por cantidad)
-                    if (item.product) {
-                        productsSales += item.product.price * item.quantity
-                    }
-                    // lo mismo pero con ticket
-                    if (item.eventTicket) {
-                        ticketsSales += item.eventTicket.price * item.quantity
-                    }
+        const [products, tickets] = await Promise.all([
+            productIds.length
+                ? ctx.prisma.product.findMany({
+                    where: { id: { in: productIds } },
+                    select: { id: true, price: true },
                 })
-            })
-            // guardo en el array la info del evento que esta en bucle (current)
-            eventsTotals.push({
-                name: event.name,
-                total: event.purchases.reduce((previousValue, currentValue) => previousValue + (currentValue.total ?? 0), 0),
-                image: event.image,
-                eventId: event.id
-            })
-        })
+                : Promise.resolve([] as { id: string; price: number }[]),
+            ticketIds.length
+                ? ctx.prisma.eventTicket.findMany({
+                    where: { id: { in: ticketIds } },
+                    select: { id: true, price: true },
+                })
+                : Promise.resolve([] as { id: string; price: number }[]),
+        ])
 
-        // if (!eventsTotals || eventsTotals.length < 1) {
-        //     return {}
-        // }
+        const productPriceMap = new Map(products.map((p) => [p.id, p.price]))
+        const ticketPriceMap = new Map(tickets.map((t) => [t.id, t.price]))
+
+        const productsSales = productItemGroups.reduce(
+            (sum, g) => sum + (productPriceMap.get(g.productId!) ?? 0) * (g._sum.quantity ?? 0),
+            0
+        )
+        const ticketsSales = ticketItemGroups.reduce(
+            (sum, g) => sum + (ticketPriceMap.get(g.eventTicketId!) ?? 0) * (g._sum.quantity ?? 0),
+            0
+        )
+
+        const eventTotalMap = new Map(
+            eventTotalsAgg.map((e) => [e.eventId!, e._sum.total ?? 0])
+        )
+
+        const eventsTotals = events.map((event) => ({
+            name: event.name,
+            total: eventTotalMap.get(event.id) ?? 0,
+            image: event.image,
+            eventId: event.id,
+        }))
 
         return {
-            totalGuildSales,
+            totalGuildSales: totalAgg._sum.total ?? 0,
             productsSales,
             ticketsSales,
-            eventsTotals
+            eventsTotals,
         }
-
     })
 });

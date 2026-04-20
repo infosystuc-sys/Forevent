@@ -248,6 +248,10 @@ model Event {
 
   @@index([locationId])
   @@index([guildId])
+  @@index([startsAt])
+  @@index([status, discharged])
+  @@index([guildId, status, discharged])
+  @@index([guildId, endsAt])
 }
 
 model Counter {
@@ -395,6 +399,7 @@ model Purchase {
   @@index([buyerId])
   @@index([eventId])
   @@index([claimId])
+  @@index([status])
 }
 
 model Deal {
@@ -524,6 +529,7 @@ model UserTicket {
   @@index([ticketId])
   @@index([buyerId])
   @@index([ownerId])
+  @@index([discharged])
 }
 
 model UserPurchase {

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -127,6 +127,8 @@ export async function createEventAction(
     },
   });
 
+  revalidateTag("admin-dashboard");
+  revalidateTag(`guild-${organizationId}`);
   revalidatePath("/admin");
   redirect("/admin?toast=created");
 }
@@ -301,12 +303,16 @@ export async function updateEventAction(
     }
   });
 
+  revalidateTag("admin-dashboard");
+  revalidateTag(`guild-${organizationId}`);
   revalidatePath("/admin");
   redirect("/admin?toast=updated");
 }
 
 export async function deleteEventAction(eventId: string) {
-  await db.event.delete({ where: { id: eventId } });
+  const deleted = await db.event.delete({ where: { id: eventId }, select: { guildId: true } });
+  revalidateTag("admin-dashboard");
+  if (deleted?.guildId) revalidateTag(`guild-${deleted.guildId}`);
   revalidatePath("/admin");
   redirect("/admin?toast=deleted");
 }

@@ -11,6 +11,7 @@
     "clean": "rm -rf .turbo node_modules",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint .",
+    "push": "dotenv -e ../../.env -- prisma db push --skip-generate",
     "studio": "prisma studio",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit"

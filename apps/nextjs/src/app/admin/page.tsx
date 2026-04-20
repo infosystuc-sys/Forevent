@@ -1,9 +1,11 @@
-import db, { type Prisma, Status } from "@forevent/db";
+import db, { Status } from "@forevent/db";
 import { Button } from "@forevent/ui/button";
 import { Input } from "@forevent/ui/input";
 import { Label } from "@forevent/ui/label";
-import { PauseCircle, PlayCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, PauseCircle, PlayCircle } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 
 import { toggleEventStatus } from "./actions";
 import { deleteEventAction } from "./events/actions";
@@ -31,28 +33,50 @@ const statusLabels: Record<Status, string> = {
   [Status.REJECTED]: "Rechazado",
 };
 
-type EventRow = Prisma.EventGetPayload<{
-  select: {
-    id: true;
-    name: true;
-    image: true;
-    status: true;
-    startsAt: true;
-    endsAt: true;
-    guild: { select: { id: true; name: true } };
-    tickets: {
-      select: {
-        quantity: true;
-        _count: { select: { userTicket: true } };
-      };
-    };
-  };
-}>;
+const PAGE_SIZE = 20;
 
-export default async function AdminDashboard() {
-  const [events, activeCount, totalSold, totalRevenue] = await Promise.all([
+const getDashboardMetrics = unstable_cache(
+  async () => {
+    const [activeCount, totalEvents, totalSold, totalRevenue, capacityAgg, soldAgg] =
+      await Promise.all([
+        db.event.count({ where: { status: Status.ACCEPTED, discharged: true } }),
+        db.event.count(),
+        db.userTicket.count({ where: { discharged: true } }),
+        db.purchase.aggregate({
+          _sum: { total: true },
+          where: { status: Status.ACCEPTED },
+        }),
+        db.eventTicket.aggregate({ _sum: { quantity: true } }),
+        db.userTicket.count({ where: { discharged: true } }),
+      ]);
+    const totalCapacityAll = capacityAgg._sum.quantity ?? 0;
+    const totalSoldAll = soldAgg;
+    return {
+      activeCount,
+      totalEvents,
+      totalSold,
+      revenue: totalRevenue._sum.total ?? 0,
+      totalCapacityAll,
+      totalSoldAll,
+    };
+  },
+  ["admin-dashboard-metrics"],
+  { revalidate: 60, tags: ["admin-dashboard"] },
+);
+
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams?: { page?: string };
+}) {
+  const page = Math.max(1, Number(searchParams?.page ?? "1") || 1);
+  const skip = (page - 1) * PAGE_SIZE;
+
+  const [events, totalCount, metrics] = await Promise.all([
     db.event.findMany({
       orderBy: { startsAt: "desc" },
+      take: PAGE_SIZE,
+      skip,
       select: {
         id: true,
         name: true,
@@ -61,52 +85,49 @@ export default async function AdminDashboard() {
         startsAt: true,
         endsAt: true,
         guild: { select: { id: true, name: true } },
-        tickets: {
-          select: {
-            quantity: true,
-            _count: { select: { userTicket: true } },
-          },
-        },
+        tickets: { select: { id: true, quantity: true } },
       },
     }),
-    db.event.count({ where: { status: Status.ACCEPTED, discharged: true } }),
-    db.userTicket.count({ where: { discharged: true } }),
-    db.purchase.aggregate({
-      _sum: { total: true },
-      where: { status: Status.ACCEPTED },
-    }),
+    db.event.count(),
+    getDashboardMetrics(),
   ]);
 
-  const hasEvents = events.length > 0;
+  const ticketIds = events.flatMap((e) => e.tickets.map((t) => t.id));
+  const soldPerTicket =
+    ticketIds.length > 0
+      ? await db.userTicket.groupBy({
+          by: ["ticketId"],
+          where: { ticketId: { in: ticketIds } },
+          _count: { _all: true },
+        })
+      : [];
+  const soldMap = new Map<string, number>();
+  for (const row of soldPerTicket) {
+    soldMap.set(row.ticketId, row._count._all);
+  }
 
-  const totalCapacityAll = events.reduce(
-    (sum, e) => sum + e.tickets.reduce((s, t) => s + t.quantity, 0),
-    0,
-  );
-  const totalSoldAll = events.reduce(
-    (sum, e) => sum + e.tickets.reduce((s, t) => s + t._count.userTicket, 0),
-    0,
-  );
+  const hasEvents = events.length > 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
   const avgCapacity =
-    totalCapacityAll > 0
-      ? Math.round((totalSoldAll / totalCapacityAll) * 100)
+    metrics.totalCapacityAll > 0
+      ? Math.round((metrics.totalSoldAll / metrics.totalCapacityAll) * 100)
       : 0;
 
-  const revenue = totalRevenue._sum.total ?? 0;
   const revenueLabel =
-    revenue >= 1_000_000
-      ? `$ ${(revenue / 1_000_000).toFixed(1).replace(".", ",")}M`
-      : `$ ${revenue.toLocaleString("es-AR")}`;
+    metrics.revenue >= 1_000_000
+      ? `$ ${(metrics.revenue / 1_000_000).toFixed(1).replace(".", ",")}M`
+      : `$ ${metrics.revenue.toLocaleString("es-AR")}`;
 
-  const metrics = [
+  const metricsList = [
     {
       label: "Eventos activos",
-      value: activeCount.toString(),
-      description: `${events.length} en total`,
+      value: metrics.activeCount.toString(),
+      description: `${metrics.totalEvents} en total`,
     },
     {
       label: "Entradas vendidas",
-      value: totalSold.toLocaleString("es-AR"),
+      value: metrics.totalSold.toLocaleString("es-AR"),
       description: "Total acumulado",
     },
     {
@@ -146,7 +167,7 @@ export default async function AdminDashboard() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
+        {metricsList.map((metric) => (
           <div
             key={metric.label}
             className="rounded-xl border bg-card p-5 shadow-sm"
@@ -166,7 +187,7 @@ export default async function AdminDashboard() {
             <h2 className="text-xl font-semibold">
               Eventos{" "}
               <span className="text-sm font-normal text-muted-foreground">
-                ({events.length})
+                ({totalCount})
               </span>
             </h2>
             <p className="text-sm text-muted-foreground">
@@ -203,7 +224,7 @@ export default async function AdminDashboard() {
               capacidad.
             </div>
           )}
-          {events.map((event: EventRow) => {
+          {events.map((event) => {
             const isActive = event.status === Status.ACCEPTED;
             const toggleLabel = isActive ? "Pausar" : "Publicar";
             const capacity = event.tickets.reduce(
@@ -211,7 +232,7 @@ export default async function AdminDashboard() {
               0,
             );
             const sold = event.tickets.reduce(
-              (total, ticket) => total + ticket._count.userTicket,
+              (total, ticket) => total + (soldMap.get(ticket.id) ?? 0),
               0,
             );
             const capacityPercent =
@@ -231,12 +252,14 @@ export default async function AdminDashboard() {
               >
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="h-10 w-10 overflow-hidden rounded-full bg-muted">
+                    <div className="relative h-10 w-10 overflow-hidden rounded-full bg-muted">
                       {event.image ? (
-                        <img
+                        <Image
                           src={event.image}
                           alt={event.name}
-                          className="h-10 w-10 object-contain"
+                          fill
+                          sizes="40px"
+                          className="object-contain"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
@@ -316,6 +339,48 @@ export default async function AdminDashboard() {
             );
           })}
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-muted-foreground">
+              Página {page} de {totalPages}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page <= 1}
+                asChild={page > 1}
+              >
+                {page > 1 ? (
+                  <Link href={`/admin?page=${page - 1}#eventos`}>
+                    <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+                  </Link>
+                ) : (
+                  <span>
+                    <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+                  </span>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page >= totalPages}
+                asChild={page < totalPages}
+              >
+                {page < totalPages ? (
+                  <Link href={`/admin?page=${page + 1}#eventos`}>
+                    Siguiente <ChevronRight className="ml-1 h-4 w-4" />
+                  </Link>
+                ) : (
+                  <span>
+                    Siguiente <ChevronRight className="ml-1 h-4 w-4" />
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

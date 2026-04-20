@@ -17,7 +17,6 @@ import {
 import * as React from "react"
 
 import type { ArrayElement, RouterOutputs } from "@forevent/api"
-import { useParams, useSearchParams } from "next/navigation"
 import { DataTablePagination } from "~/app/_components/table/pagination"
 import { Avatar, AvatarFallback, AvatarImage } from "~/app/_components/ui/avatar"
 import { Input } from "~/app/_components/ui/input"
@@ -30,12 +29,10 @@ import {
     TableHeader,
     TableRow,
 } from "~/app/_components/ui/table"
-import { api } from "~/trpc/react"
 
-type Search = 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'PENDING' | 'PAST' | undefined
-const searchStrings = ['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'PAST']
+type Row = ArrayElement<Awaited<RouterOutputs["web"]["event"]["byGuildId"]>["rows"]>
 
-const columns: ColumnDef<ArrayElement<Awaited<RouterOutputs["web"]["event"]["byGuildId"]>>>[] = [
+const columns: ColumnDef<Row>[] = [
     {
         accessorKey: "image",
         header: " ",
@@ -106,23 +103,14 @@ const columns: ColumnDef<ArrayElement<Awaited<RouterOutputs["web"]["event"]["byG
     },
 ]
 
-export function DataTable({ data }: { data: Awaited<RouterOutputs["web"]["event"]["byGuildId"]> }) {
-    const searchParams = useSearchParams().get('q')
+export function DataTable({ data }: { data: Row[] }) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
     const [rowSelection, setRowSelection] = React.useState({})
-    const params = useParams()
-
-    const getLocations = api.web.event.byGuildId.useQuery({
-        guildId: params?.guildId! as string,
-        q: searchParams && searchStrings.includes(searchParams) ? searchParams as Search : undefined
-    }, {
-        initialData: data,
-    })
 
     const table = useReactTable({
-        data: getLocations.data,
+        data,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
