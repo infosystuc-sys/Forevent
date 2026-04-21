@@ -198,9 +198,6 @@ importers:
       react-native:
         specifier: 0.73.6
         version: 0.73.6(@babel/core@7.26.9)(@babel/preset-env@7.26.9)(react@18.2.0)
-      react-native-background-timer:
-        specifier: ^2.4.1
-        version: 2.4.1(react-native@0.73.6)
       react-native-confirmation-code-field:
         specifier: ^7.3.2
         version: 7.4.0(react-native@0.73.6)(react@18.2.0)
@@ -210,9 +207,6 @@ importers:
       react-native-maps:
         specifier: 1.10.0
         version: 1.10.0(react-native@0.73.6)(react@18.2.0)
-      react-native-permissions:
-        specifier: ^4.1.1
-        version: 4.1.5(react-native@0.73.6)(react@18.2.0)
       react-native-qrcode-svg:
         specifier: ^6.3.0
         version: 6.3.14(react-native-svg@14.1.0)(react-native@0.73.6)(react@18.2.0)
@@ -274,9 +268,6 @@ importers:
       '@types/react':
         specifier: ~18.2.45
         version: 18.2.47
-      '@types/react-native-background-timer':
-        specifier: ^2.0.2
-        version: 2.0.2
       dotenv-cli:
         specifier: ^7.3.0
         version: 7.4.4
@@ -10159,10 +10150,6 @@ packages:
     dependencies:
       '@types/react': 18.2.47
 
-  /@types/react-native-background-timer@2.0.2:
-    resolution: {integrity: sha512-cMAep0M5yqUHjiiRPvGiviqiJYdI45KSjbI5ufsIFSQGFwHwrHJC/8yawNhy0G3Gix6fufWLsEj6jC5niUNHiQ==}
-    dev: true
-
   /@types/react-transition-group@4.4.12(@types/react@18.2.47):
     resolution: {integrity: sha512-8TV6R3h2j7a91c+1DXdJi3Syo69zzIZbz7Lg5tORM5LEJG7X/E6a1V3drRyBRZq7/utz7A+c4OgYLiLcYGHG6w==}
     peerDependencies:
@@ -17880,14 +17867,6 @@ packages:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
     dev: false
 
-  /react-native-background-timer@2.4.1(react-native@0.73.6):
-    resolution: {integrity: sha512-TE4Kiy7jUyv+hugxDxitzu38sW1NqjCk4uE5IgU2WevLv7sZacaBc6PZKOShNRPGirLl1NWkaG3LDEkdb9Um5g==}
-    peerDependencies:
-      react-native: '>=0.47.0'
-    dependencies:
-      react-native: 0.73.6(@babel/core@7.26.9)(@babel/preset-env@7.26.9)(react@18.2.0)
-    dev: false
-
   /react-native-confirmation-code-field@7.4.0(react-native@0.73.6)(react@18.2.0):
     resolution: {integrity: sha512-Kw7rD0RXi6vZnt0Y67nkSW2wYmZFdnxJ23yxkKm3jqwvSxAvaA1NP3h3MHSPmJd25l0WK/+fjXOeCliDqWZ9rw==}
     peerDependencies:
@@ -17974,20 +17953,6 @@ packages:
         optional: true
     dependencies:
       '@types/geojson': 7946.0.16
-      react: 18.2.0
-      react-native: 0.73.6(@babel/core@7.26.9)(@babel/preset-env@7.26.9)(react@18.2.0)
-    dev: false
-
-  /react-native-permissions@4.1.5(react-native@0.73.6)(react@18.2.0):
-    resolution: {integrity: sha512-r6VMRacASmtRHS+GZ+5HQCp9p9kiE+UU9magHOZCXZLTJitdTuVHWZRrb4v4oqZGU+zAp3mZhTQftuMMv+WLUg==}
-    peerDependencies:
-      react: '>=18.1.0'
-      react-native: '>=0.70.0'
-      react-native-windows: '>=0.70.0'
-    peerDependenciesMeta:
-      react-native-windows:
-        optional: true
-    dependencies:
       react: 18.2.0
       react-native: 0.73.6(@babel/core@7.26.9)(@babel/preset-env@7.26.9)(react@18.2.0)
     dev: false

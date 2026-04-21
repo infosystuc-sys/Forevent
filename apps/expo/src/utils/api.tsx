@@ -15,10 +15,15 @@ export const api = createTRPCReact<AppRouter>();
 export { type RouterInputs, type RouterOutputs } from "@forevent/api";
 
 const getBaseUrl = () => {
-  // Production override (when running a build)
-  const prodUrl = "https://forevent-nextjs-kh85nhbqy-tangopuntohogar-2495s-projects.vercel.app";
+  // Production override (when running a build). Configurar en .env del monorepo.
+  const prodUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
-  if (!__DEV__) return prodUrl;
+  if (!__DEV__) {
+    if (!prodUrl) {
+      throw new Error("EXPO_PUBLIC_API_URL no definida. Configura la URL del backend en .env antes del build.");
+    }
+    return prodUrl;
+  }
 
   // Metro Bundler exposes the host IP via hostUri (e.g. "192.168.1.x:8081")
   // We strip the Metro port and use Next.js port 3000 instead.

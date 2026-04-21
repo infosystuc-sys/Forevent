@@ -5,12 +5,10 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
-// Variable exacta: EXPO_PUBLIC_GOOGLE_MAPS_API_KEY (opcional; fallback para que el SDK nativo de Android siempre reciba una key)
-const envMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
-// Clave directa para Android: el SDK nativo la lee de android.config.googleMaps.apiKey en el build
-const ANDROID_GOOGLE_MAPS_API_KEY = envMapsKey || "AIzaSyAqSQqUDteS9L2j-svtzEvn_jo1G3kHzdw";
-if (!envMapsKey) {
-  console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY vacía; usando clave por defecto para Android.");
+// Google Maps key: obligatoria vía env. El manifest Android la inyecta con manifestPlaceholders.
+const ANDROID_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
+if (!ANDROID_GOOGLE_MAPS_API_KEY) {
+  console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY no definida. Los mapas en Android no funcionarán.");
 }
 
 const defineConfig = (): ExpoConfig => ({
@@ -36,26 +34,20 @@ const defineConfig = (): ExpoConfig => ({
     bundleIdentifier: "com.ssitgroup.forevent",
     supportsTablet: false,
     "infoPlist": {
-      "UIBackgroundModes": [
-        "location",
-        "fetch",
-        "processing"
-      ],
-      "NSLocationWhenInUseUsageDescription": "text",
-      "NSLocationAlwaysAndWhenInUseUsageDescription": "text",
-      "NSLocationAlwaysUsageDescription": "text"
+      "NSLocationWhenInUseUsageDescription": "Forevent usa tu ubicación para mostrarte eventos cercanos.",
+      "NSAppTransportSecurity": {
+        "NSAllowsArbitraryLoads": false
+      }
     }
   },
   android: {
     package: "com.ssitgroup.forevent",
-    usesCleartextTraffic: true,
     adaptiveIcon: {
       foregroundImage: "./assets/icon.png",
       backgroundColor: "#000000",
     },
-    permissions: ["ACCESS_BACKGROUND_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
     config: {
-      // Google Maps API Key para react-native-maps en Android (SDK nativo la lee en el build).
       googleMaps: {
         apiKey: ANDROID_GOOGLE_MAPS_API_KEY,
       },
