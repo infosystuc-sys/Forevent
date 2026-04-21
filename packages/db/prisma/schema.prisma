@@ -67,6 +67,7 @@ model User {
   purchasesOwner   UserPurchase[]  @relation("owner")
   ticketsBuyer     UserTicket[]    @relation("buyer")
   ticketsOwner     UserTicket[]    @relation("owner")
+  favoriteEvents   UserFavoriteEvent[]
 }
 
 model AuthChallenge {
@@ -245,6 +246,7 @@ model Event {
   purchases  Purchase[]
   reviews    Review[]
   users      UserOnEvent[]
+  favoritedBy UserFavoriteEvent[]
 
   @@index([locationId])
   @@index([guildId])
@@ -252,6 +254,19 @@ model Event {
   @@index([status, discharged])
   @@index([guildId, status, discharged])
   @@index([guildId, endsAt])
+}
+
+model UserFavoriteEvent {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  userId    String
+  eventId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
 }
 
 model Counter {

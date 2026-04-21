@@ -289,20 +289,64 @@ export default function Page() {
   const allTickets = ticketsQuery.data ?? []
 
   /**
-   * Carrusel principal "Mis Entradas":
-   *   · Tickets propios normales          (giftId=null, no isSentGift)
-   *   · Regalos pendientes recibidos      (isIncomingGift=true)
-   *   · Transferencias aceptadas          (giftId=null, giftSenderName!=null)
-   * Excluye los regalos que yo ENVIÉ (isSentGift), que van a su propia sección.
-   */
-  const carouselTickets = allTickets.filter((t) => !t.isSentGift)
-
-  /**
    * Sección "Regalos en Curso": tickets que YO regalé y aún están pendientes de aceptación.
    */
   const giftedTickets = allTickets.filter((t) => t.isSentGift)
 
-  const hasCarousel = carouselTickets.length > 0
+  /**
+   * Carrusel principal "Mis Entradas":
+   *   · Tickets propios normales y transferencias aceptadas → se agrupan por `eventTicket.id` (tipo)
+   *     mostrándose como un único card con badge = cantidad total de entradas.
+   *   · Regalos pendientes recibidos (isIncomingGift=true) → se muestran individualmente porque
+   *     tienen un flujo de aceptación propio (ruta `/gift`).
+   *   · Regalos que yo ENVIÉ (isSentGift) → se excluyen del carrusel; van a "Regalos en Curso".
+   */
+  type GroupCard = {
+    kind: 'group'
+    key: string
+    eventTicketId: string
+    totalQuantity: number
+    userTicketIds: string[]
+    representative: (typeof allTickets)[number]
+  }
+  type IncomingCard = {
+    kind: 'incoming'
+    key: string
+    ticket: (typeof allTickets)[number]
+  }
+  type CarouselItem = GroupCard | IncomingCard
+
+  const carouselItems: CarouselItem[] = React.useMemo(() => {
+    const groups = new Map<string, GroupCard>()
+    const incomings: IncomingCard[] = []
+
+    for (const t of allTickets) {
+      if (t.isSentGift) continue
+      const tid = t.id ?? t.userTicketId ?? t.url
+      if (t.isIncomingGift) {
+        incomings.push({ kind: 'incoming', key: `inc-${tid}`, ticket: t })
+        continue
+      }
+      const k = t.eventTicket.id
+      const existing = groups.get(k)
+      if (existing) {
+        existing.totalQuantity += t.quantity
+        existing.userTicketIds.push(tid)
+      } else {
+        groups.set(k, {
+          kind: 'group',
+          key: `grp-${k}`,
+          eventTicketId: k,
+          totalQuantity: t.quantity,
+          userTicketIds: [tid],
+          representative: t,
+        })
+      }
+    }
+    return [...Array.from(groups.values()), ...incomings]
+  }, [allTickets])
+
+  const hasCarousel = carouselItems.length > 0
   const hasGifted   = giftedTickets.length > 0
 
   const myPurchases = myPurchasesQuery.data ?? []
@@ -340,7 +384,7 @@ export default function Page() {
           {(hasCarousel || hasGifted) && (
             <View style={styles.totalBadge}>
               <Text style={styles.totalBadgeText}>
-                {carouselTickets.length + giftedTickets.length}
+                {allTickets.length}
               </Text>
             </View>
           )}
@@ -386,19 +430,16 @@ export default function Page() {
           <>
             {hasCarousel && (
               <View style={styles.section}>
-                <SectionHeader title="Mis Entradas" count={carouselTickets.length} />
+                <SectionHeader title="Mis Entradas" count={carouselItems.length} />
 
                 <Text style={styles.entradaCounter}>
-                  Entrada {activeIdx + 1} de {carouselTickets.length}
+                  Entrada {activeIdx + 1} de {carouselItems.length}
                 </Text>
 
                 <FlatList
-                  data={carouselTickets}
+                  data={carouselItems}
                   horizontal
-                  keyExtractor={(item) => {
-                    const i = item as TicketItem & { id?: string }
-                    return i.id ?? i.userTicketId ?? i.url ?? i.eventTicket.id
-                  }}
+                  keyExtractor={(item) => item.key}
                   showsHorizontalScrollIndicator={false}
                   snapToInterval={SNAP_INT}
                   decelerationRate="fast"
@@ -407,48 +448,60 @@ export default function Page() {
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
                   renderItem={({ item }) => {
-                    const raw = item as TicketItem & {
-                      isSentGift?: boolean
-                      isIncomingGift?: boolean
-                      giftSenderName?: string | null
-                      giftSenderImage?: string | null
+                    if (item.kind === 'incoming') {
+                      const raw = item.ticket
+                      const ticket: TicketItem = {
+                        id: raw.id ?? raw.userTicketId ?? raw.url,
+                        userTicketId: raw.userTicketId ?? raw.url,
+                        url: raw.url,
+                        quantity: raw.quantity,
+                        eventTicket: raw.eventTicket,
+                        giftId: raw.giftId ?? null,
+                        isSentGift:      raw.isSentGift      ?? false,
+                        isIncomingGift:  raw.isIncomingGift  ?? false,
+                        giftSenderName:  raw.giftSenderName  ?? null,
+                        giftSenderImage: raw.giftSenderImage ?? null,
+                      }
+                      return (
+                        <TicketItemCard
+                          ticket={ticket}
+                          cardWidth={CARD_W}
+                          styles={styles}
+                          onPress={() => router.push('/(app)/home/gift')}
+                        />
+                      )
                     }
+                    // kind === 'group': agrupado por tipo de entrada dentro del evento
+                    const rep = item.representative
                     const ticket: TicketItem = {
-                      id: raw.id ?? raw.userTicketId ?? raw.url,
-                      userTicketId: raw.userTicketId ?? raw.url,
-                      url: raw.url,
-                      quantity: raw.quantity,
-                      eventTicket: raw.eventTicket,
-                      giftId: raw.giftId ?? null,
-                      isSentGift:      raw.isSentGift      ?? false,
-                      isIncomingGift:  raw.isIncomingGift  ?? false,
-                      giftSenderName:  raw.giftSenderName  ?? null,
-                      giftSenderImage: raw.giftSenderImage ?? null,
+                      id: rep.id ?? rep.userTicketId ?? rep.url,
+                      userTicketId: rep.userTicketId ?? rep.url,
+                      url: rep.url,
+                      quantity: item.totalQuantity,
+                      eventTicket: rep.eventTicket,
+                      giftId: rep.giftId ?? null,
+                      isSentGift:      false,
+                      isIncomingGift:  false,
+                      giftSenderName:  rep.giftSenderName  ?? null,
+                      giftSenderImage: rep.giftSenderImage ?? null,
                     }
                     return (
                       <TicketItemCard
                         ticket={ticket}
                         cardWidth={CARD_W}
                         styles={styles}
-                        onPress={() => {
-                          if (ticket.isIncomingGift) {
-                            router.push('/(app)/home/gift')
-                          } else {
-                            router.push({
-                              pathname: '/(app)/home/ticket/[eventTicketId]/',
-                              params: {
-                                eventTicketId: item.eventTicket.id,
-                                userTicketId: item.id ?? item.userTicketId,
-                              },
-                            })
-                          }
-                        }}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(app)/home/ticket/[eventTicketId]/',
+                            params: { eventTicketId: item.eventTicketId },
+                          })
+                        }
                       />
                     )
                   }}
                 />
 
-                <PagerDots total={carouselTickets.length} active={activeIdx} />
+                <PagerDots total={carouselItems.length} active={activeIdx} />
               </View>
             )}
 

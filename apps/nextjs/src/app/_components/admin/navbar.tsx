@@ -196,11 +196,7 @@ export default function AdminNavBar(
                         </Popover>
                     </div>
                 }
-                <div>
-                    <h1 className="w-max">
-                        Version beta 23/02/2024
-                    </h1>
-                </div>
+
                 {options?.menu &&
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>

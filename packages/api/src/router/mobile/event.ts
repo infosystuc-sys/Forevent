@@ -700,4 +700,49 @@ export const eventRouter = createTRPCRouter({
   "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
     return
   }),
+
+  myFavoriteIds: publicProcedure.input(z.object({
+    userId: z.string(),
+  })).query(async ({ ctx, input }) => {
+    const rows = await ctx.prisma.userFavoriteEvent.findMany({
+      where: { userId: input.userId },
+      select: { eventId: true },
+    })
+    return rows.map(r => r.eventId)
+  }),
+
+  listFavorites: publicProcedure.input(z.object({
+    userId: z.string(),
+  })).query(async ({ ctx, input }) => {
+    const rows = await ctx.prisma.userFavoriteEvent.findMany({
+      where: {
+        userId: input.userId,
+        event: highlightedBaseWhere,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        event: { select: highlightedSelect },
+      },
+    })
+    return rows.map(r => r.event)
+  }),
+
+  toggleFavorite: publicProcedure.input(z.object({
+    userId: z.string(),
+    eventId: z.string(),
+  })).mutation(async ({ ctx, input }) => {
+    const { userId, eventId } = input
+    const existing = await ctx.prisma.userFavoriteEvent.findUnique({
+      where: { userId_eventId: { userId, eventId } },
+      select: { id: true },
+    })
+    if (existing) {
+      await ctx.prisma.userFavoriteEvent.delete({ where: { id: existing.id } })
+      return { favorited: false }
+    }
+    await ctx.prisma.userFavoriteEvent.create({
+      data: { userId, eventId },
+    })
+    return { favorited: true }
+  }),
 });

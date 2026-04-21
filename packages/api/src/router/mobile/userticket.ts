@@ -345,11 +345,32 @@ export const userTicketRouter = createTRPCRouter({
     }
 
     const primaryTicket = tickets[0]!
-    const g = primaryTicket.gift
-    const isGift = g != null
-    const giftStatus = g?.status ?? null
-    const isSentGift = isGift && g!.giftRequesterId === userId
-    const isGiftBlocking = isGift && (giftStatus === 'PENDING' || giftStatus === 'ACCEPTED')
+
+    const ticketsData = tickets.map((t) => {
+      const g = t.gift
+      const isGift = g != null
+      const giftStatus = g?.status ?? null
+      const isSentGift = isGift && g!.giftRequesterId === userId
+      const isGiftBlocking = isGift && (giftStatus === 'PENDING' || giftStatus === 'ACCEPTED')
+
+      return {
+        userTicketId: t.id,
+        url: t.id,
+        isGift,
+        giftStatus,
+        giftId: g?.id ?? null,
+        isSentGift,
+        isGiftBlocking,
+        giftSender: !isSentGift && isGift && g?.giftRequester
+          ? { id: g.giftRequester.id, name: g.giftRequester.name, image: g.giftRequester.image }
+          : null,
+        giftReceiver: isSentGift && g?.giftReceiver
+          ? { id: g.giftReceiver.id, name: g.giftReceiver.name, image: g.giftReceiver.image }
+          : null,
+      }
+    })
+
+    const availableCount = ticketsData.filter((t) => !t.isGiftBlocking).length
 
     return {
       eventTicket: {
@@ -364,19 +385,9 @@ export const userTicketRouter = createTRPCRouter({
           endsAt: primaryTicket.ticket.event.endsAt,
         },
       },
-      url: primaryTicket.id,
-      quantity: tickets.length,
-      isGift,
-      giftStatus,
-      giftId: g?.id ?? null,
-      isSentGift,
-      isGiftBlocking,
-      giftSender: !isSentGift && isGift && g?.giftRequester
-        ? { id: g.giftRequester.id, name: g.giftRequester.name, image: g.giftRequester.image }
-        : null,
-      giftReceiver: isSentGift && g?.giftReceiver
-        ? { id: g.giftReceiver.id, name: g.giftReceiver.name, image: g.giftReceiver.image }
-        : null,
+      tickets: ticketsData,
+      quantity: ticketsData.length,
+      availableCount,
     }
   }),
 

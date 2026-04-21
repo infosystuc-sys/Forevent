@@ -593,8 +593,25 @@ export default function Page() {
     onError: (error) => Alert.alert('Error al anular', error.message),
   })
 
+  // ─── Derived ticket data ───────────────────────────────────────────────────
+  const ticketsList = (ticket.data?.tickets ?? []) as Array<{
+    userTicketId: string
+    url: string
+    isGift: boolean
+    giftStatus: string | null
+    giftId: string | null
+    isSentGift: boolean
+    isGiftBlocking: boolean
+    giftSender: { id: string; name: string | null; image: string | null } | null
+    giftReceiver: { id: string; name: string | null; image: string | null } | null
+  }>
+
+  const firstAvailableTicket = ticketsList.find((t) => !t.isGiftBlocking) ?? null
+  const availableCount = ticket.data?.availableCount ?? 0
+
   useEffect(() => {
-    socket.emit('joinTransaction', { userId: user?.id, userTicketId: ticket.data?.url ?? userTicketId ?? eventTicketId })
+    const socketTicketId = firstAvailableTicket?.url ?? ticketsList[0]?.url ?? userTicketId ?? eventTicketId
+    socket.emit('joinTransaction', { userId: user?.id, userTicketId: socketTicketId })
     socket.on('response', ({ message, code }: { message: string; code: string }) => {
       console.log('Socket response:', message, code)
     })
@@ -630,14 +647,24 @@ export default function Page() {
     { paddingBottom: safeBottomArea || 6 },
   ], [safeBottomArea])
 
-  const onEmailSubmit: SubmitHandler<z.infer<typeof emailSchema>> = (data) => {
-    invite.mutate({ requesterId: user!.id, receiverEmail: data.email, userTicketsIds: [ticket.data!.url!] })
-  }
+  // ─── Gift flow: qué ticket regalar ────────────────────────────────────────
+  const [selectedGiftTicketId, setSelectedGiftTicketId] = useState<string | null>(null)
 
-  // ─── Derived ticket data ───────────────────────────────────────────────────
-  const qrValue = ticket.data?.url
-    ? JSON.stringify({ url: ticket.data.url, u: user?.id })
-    : 'loading'
+  // Inicializa/sincroniza con el primer ticket disponible cuando cambia la lista
+  useEffect(() => {
+    if (!firstAvailableTicket) return
+    if (!selectedGiftTicketId || !ticketsList.some((t) => t.url === selectedGiftTicketId && !t.isGiftBlocking)) {
+      setSelectedGiftTicketId(firstAvailableTicket.url)
+    }
+  }, [ticketsList.map((t) => t.url).join('|'), firstAvailableTicket?.url])
+
+  const onEmailSubmit: SubmitHandler<z.infer<typeof emailSchema>> = (data) => {
+    if (!selectedGiftTicketId) {
+      Alert.alert('Error', 'No hay entradas disponibles para regalar.')
+      return
+    }
+    invite.mutate({ requesterId: user!.id, receiverEmail: data.email, userTicketsIds: [selectedGiftTicketId] })
+  }
 
   const eventName = ticket.data?.eventTicket?.event.name ?? '—'
   const venueName = ticket.data?.eventTicket?.locatioName ?? ''
@@ -647,20 +674,11 @@ export default function Page() {
     : '—'
   const ticketQty = ticket.data?.quantity ?? 0
 
-  const isGift         = ticket.data?.isGift         ?? false
-  const giftStatus     = ticket.data?.giftStatus     ?? null
-  const giftId         = ticket.data?.giftId         ?? null
-  const isSentGift     = ticket.data?.isSentGift     ?? false
-  const isGiftBlocking = ticket.data?.isGiftBlocking ?? false
-  const giftPerson     = isSentGift
-    ? (ticket.data?.giftReceiver ?? null)
-    : (ticket.data?.giftSender   ?? null)
+  const canEnter = availableCount > 0
+  const canSend  = ticketsList.some((t) => !t.isGiftBlocking)
+  const allBlocked = ticketsList.length > 0 && availableCount === 0
 
-  const canEnterRaw = (ticket.data?.quantity ?? 0) > 0
-  const canEnter    = canEnterRaw && !isGiftBlocking
-  const canSend     = !isGiftBlocking
-
-  const handleCancelGift = () => {
+  const handleCancelGift = (giftId: string | null) => {
     if (!giftId) return
     Alert.alert(
       'Anular envío',
@@ -774,77 +792,90 @@ export default function Page() {
             {/* ── Ticket card ── */}
             <View style={styles.ticketCard}>
               <View style={styles.ticketHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.ticketLabel}>TIPO DE ENTRADA</Text>
                   <Text style={styles.ticketType}>
                     {ticket.data?.eventTicket?.name ?? 'General'}
                   </Text>
                 </View>
-                <View style={styles.ticketStatusBadge}>
-                  {isGiftBlocking ? (
-                    <>
-                      <View style={[styles.statusDot, { backgroundColor: '#f59e0b' }]} />
-                      <Text style={[styles.ticketStatusText, { color: '#f59e0b' }]}>En regalo</Text>
-                    </>
-                  ) : canEnterRaw ? (
-                    <>
-                      <View style={[styles.statusDot, { backgroundColor: '#22c55e' }]} />
-                      <Text style={[styles.ticketStatusText, { color: '#22c55e' }]}>Activa</Text>
-                    </>
-                  ) : (
-                    <>
-                      <View style={[styles.statusDot, { backgroundColor: '#6b7280' }]} />
-                      <Text style={[styles.ticketStatusText, { color: '#6b7280' }]}>Usada</Text>
-                    </>
-                  )}
-                </View>
+                {ticketQty > 0 && (
+                  <View style={styles.ticketCountBadge}>
+                    <MaterialCommunityIcons name="ticket-confirmation-outline" size={13} color={C.magenta} />
+                    <Text style={styles.ticketCountText}>
+                      {ticketQty > 1 ? `×${ticketQty}` : '1'}
+                    </Text>
+                  </View>
+                )}
               </View>
+
+              {ticketsList.map((t, i) => {
+                const qrValue = JSON.stringify({ url: t.url, u: user?.id })
+                const isBlocked = t.isGiftBlocking
+                const statusColor = isBlocked ? '#f59e0b' : '#22c55e'
+                const statusLabel = isBlocked ? 'En regalo' : 'Activa'
+                const giftPerson = t.isSentGift ? t.giftReceiver : t.giftSender
+                return (
+                  <View key={t.url}>
+                    <TicketPerforation />
+
+                    <View style={styles.qrSlotHeader}>
+                      <Text style={styles.qrSlotTitle}>
+                        Entrada {i + 1} de {ticketsList.length}
+                      </Text>
+                      <View style={styles.ticketStatusBadge}>
+                        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                        <Text style={[styles.ticketStatusText, { color: statusColor }]}>{statusLabel}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.qrSection}>
+                      <View style={styles.qrGlow} />
+                      <View style={[styles.qrWrapper, isBlocked && { opacity: 0.35 }]}>
+                        <QRCode
+                          value={qrValue}
+                          size={196}
+                          quietZone={16}
+                          backgroundColor="#ffffff"
+                          color="#180a2e"
+                        />
+                      </View>
+                      <Text style={styles.qrHint}>
+                        {isBlocked
+                          ? 'Entrada no disponible — está en regalo'
+                          : 'Presenta este código en la entrada del evento'}
+                      </Text>
+                      <Text style={styles.qrId} numberOfLines={1}>
+                        #{t.url.slice(-12).toUpperCase()}
+                      </Text>
+                    </View>
+
+                    {t.isGift && (
+                      <GiftBanner
+                        status={t.giftStatus}
+                        isSentGift={t.isSentGift}
+                        person={giftPerson}
+                        onCancel={() => handleCancelGift(t.giftId)}
+                        isCancelling={cancelGift.isPending}
+                      />
+                    )}
+                  </View>
+                )
+              })}
 
               <TicketPerforation />
 
-              <View style={styles.qrSection}>
-                <View style={styles.qrGlow} />
-                <View style={styles.qrWrapper}>
-                  <QRCode
-                    value={qrValue}
-                    size={196}
-                    quietZone={16}
-                    backgroundColor="#ffffff"
-                    color="#180a2e"
-                  />
-                </View>
-                <Text style={styles.qrHint}>
-                  Presenta este código en la entrada del evento
-                </Text>
-                <Text style={styles.qrId} numberOfLines={1}>
-                  #{(ticket.data?.url ?? '').slice(-12).toUpperCase()}
-                </Text>
-              </View>
-
-              <TicketPerforation />
-
-              {isGift && (
-                <GiftBanner
-                  status={giftStatus}
-                  isSentGift={isSentGift}
-                  person={giftPerson}
-                  onCancel={handleCancelGift}
-                  isCancelling={cancelGift.isPending}
-                />
-              )}
-
-              {isGiftBlocking && (
+              {allBlocked && (
                 <View style={styles.giftBlockNotice}>
                   <MaterialCommunityIcons name="information-outline" size={15} color="#f59e0b" />
                   <Text style={styles.giftBlockText}>
-                    Esta entrada no está disponible porque fue enviada como regalo
+                    Todas las entradas están en proceso de regalo
                   </Text>
                 </View>
               )}
 
               <View style={styles.infoRows}>
                 <Pressable
-                  style={[styles.infoRow, isGiftBlocking && styles.infoRowDisabled]}
+                  style={[styles.infoRow, !canSend && styles.infoRowDisabled]}
                   onPress={() => {
                     if (!canSend) return
                     setSend(true)
@@ -859,12 +890,14 @@ export default function Page() {
                   />
                   <View style={styles.infoRowText}>
                     <Text style={[styles.infoRowTitle, !canSend && { color: C.dim }]}>
-                      Enviar entrada a un amigo
+                      {ticketsList.length > 1 ? 'Regalar una entrada a un amigo' : 'Enviar entrada a un amigo'}
                     </Text>
                     <Text style={styles.infoRowSub}>
                       {canSend
-                        ? 'Transfiere esta entrada antes de activarla'
-                        : 'No disponible mientras el regalo esté pendiente'}
+                        ? ticketsList.length > 1
+                          ? 'Elegí cuál de tus entradas regalar'
+                          : 'Transfiere esta entrada antes de activarla'
+                        : 'No hay entradas disponibles para regalar'}
                     </Text>
                   </View>
                   {canSend && <MaterialCommunityIcons name="chevron-right" size={18} color={C.dim} />}
@@ -889,12 +922,15 @@ export default function Page() {
               <Pressable
                 style={[
                   styles.enterBtnPress,
-                  (!canEnter || isGiftBlocking) && styles.enterBtnDisabled,
+                  !canEnter && styles.enterBtnDisabled,
                 ]}
-                disabled={!canEnter || isGiftBlocking || enter.isPending}
-                onPress={() => enter.mutate({ userId: user!.id, userTicketId: ticket.data!.url! })}
+                disabled={!canEnter || enter.isPending}
+                onPress={() => {
+                  if (!firstAvailableTicket) return
+                  enter.mutate({ userId: user!.id, userTicketId: firstAvailableTicket.url })
+                }}
               >
-                {canEnter && !isGiftBlocking ? (
+                {canEnter ? (
                   <LinearGradient
                     colors={['#ff00ff', '#8b00ff', '#411377']}
                     start={{ x: 0, y: 0 }}
@@ -910,10 +946,10 @@ export default function Page() {
                       </>
                     )}
                   </LinearGradient>
-                ) : isGiftBlocking ? (
+                ) : allBlocked ? (
                   <View style={[styles.enterBtnUsed, { opacity: 0.5 }]}>
                     <MaterialCommunityIcons name="gift-outline" size={20} color="#f59e0b" />
-                    <Text style={[styles.enterBtnText, { color: '#f59e0b' }]}>ENVIADO COMO REGALO</Text>
+                    <Text style={[styles.enterBtnText, { color: '#f59e0b' }]}>TODAS EN REGALO</Text>
                   </View>
                 ) : (
                   <View style={styles.enterBtnUsed}>
@@ -924,10 +960,12 @@ export default function Page() {
               </Pressable>
 
               <Text style={styles.enterHint}>
-                {isGiftBlocking
-                  ? 'Anulá el regalo para recuperar el acceso a esta entrada'
+                {allBlocked
+                  ? 'Anulá algún regalo para recuperar el acceso'
                   : canEnter
-                    ? 'El QR se activa automáticamente al presentarlo'
+                    ? ticketsList.length > 1
+                      ? `Ingresa con la primera entrada disponible (quedan ${availableCount - 1} más)`
+                      : 'El QR se activa automáticamente al presentarlo'
                     : 'Esta entrada ya fue escaneada en el ingreso'}
               </Text>
             </View>
@@ -1034,6 +1072,53 @@ export default function Page() {
         <BottomSheetView style={contentContainerStyle}>
           <Text style={styles.bsTitle}>Enviar entrada</Text>
           <Text style={styles.bsSub}>Busca el correo de tu amigo o selecciónalo de tu lista</Text>
+
+          {ticketsList.length > 1 && (
+            <View style={styles.giftPickerWrap}>
+              <Text style={styles.giftPickerLabel}>¿Cuál entrada querés regalar?</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.giftPickerRow}
+              >
+                {ticketsList.map((t, i) => {
+                  const disabled = t.isGiftBlocking
+                  const selected = selectedGiftTicketId === t.url
+                  return (
+                    <Pressable
+                      key={t.url}
+                      style={[
+                        styles.giftPickerChip,
+                        selected && styles.giftPickerChipSelected,
+                        disabled && styles.giftPickerChipDisabled,
+                      ]}
+                      onPress={() => !disabled && setSelectedGiftTicketId(t.url)}
+                      disabled={disabled}
+                    >
+                      <MaterialCommunityIcons
+                        name={disabled ? 'gift-outline' : selected ? 'ticket-confirmation' : 'ticket-confirmation-outline'}
+                        size={14}
+                        color={disabled ? '#f59e0b' : selected ? C.white : C.dim}
+                      />
+                      <Text style={[
+                        styles.giftPickerChipText,
+                        selected && { color: C.white },
+                        disabled && { color: '#f59e0b' },
+                      ]}>
+                        Entrada {i + 1}
+                      </Text>
+                      <Text style={[
+                        styles.giftPickerChipId,
+                        selected && { color: 'rgba(255,255,255,0.75)' },
+                      ]}>
+                        #{t.url.slice(-6).toUpperCase()}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+            </View>
+          )}
 
           <FormProvider {...emailForm}>
             <Controller
@@ -1429,4 +1514,88 @@ const styles = StyleSheet.create({
     shadowColor: C.magenta, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6,
   },
   bsBtnText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+
+  // ── Ticket count badge (en el header del card)
+  ticketCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,0,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,0,255,0.30)',
+    borderRadius: 50,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  ticketCountText: {
+    color: C.magenta,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+
+  // ── Per-QR slot header (Entrada N de M + status)
+  qrSlotHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 2,
+  },
+  qrSlotTitle: {
+    color: C.dim,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+
+  // ── Gift picker (en bottom sheet)
+  giftPickerWrap: {
+    marginBottom: 10,
+  },
+  giftPickerLabel: {
+    color: C.dim,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  giftPickerRow: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  giftPickerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  giftPickerChipSelected: {
+    backgroundColor: C.magenta,
+    borderColor: C.magenta,
+  },
+  giftPickerChipDisabled: {
+    opacity: 0.55,
+    borderColor: 'rgba(245,158,11,0.35)',
+    backgroundColor: 'rgba(245,158,11,0.08)',
+  },
+  giftPickerChipText: {
+    color: C.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  giftPickerChipId: {
+    color: C.dim,
+    fontSize: 10,
+    letterSpacing: 1,
+    fontWeight: '700',
+  },
 })

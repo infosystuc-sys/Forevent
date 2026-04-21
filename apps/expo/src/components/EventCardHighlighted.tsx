@@ -2,10 +2,12 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
-import React, { useState } from 'react'
+import React from 'react'
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { RouterOutputs } from '@forevent/api'
 import { type ArrayElement } from '@forevent/api/types'
+import { useSession } from '~/context/auth'
+import { api } from '~/utils/api'
 import { blurhash, dayjs, PLACEHOLDER } from '~/utils/constants'
 
 const { width: SCREEN_W } = Dimensions.get('window')
@@ -44,7 +46,40 @@ interface Props {
 }
 
 export default function EventCardHighlighted({ item, index = 0 }: Props) {
-    const [liked, setLiked] = useState(false)
+    const { user } = useSession()
+    const utils = api.useUtils()
+    const favoriteIdsQuery = api.mobile.event.myFavoriteIds.useQuery(
+        { userId: user?.id ?? '' },
+        { enabled: !!user?.id, staleTime: 60_000 },
+    )
+    const liked = favoriteIdsQuery.data?.includes(item.id) ?? false
+
+    const toggleFavorite = api.mobile.event.toggleFavorite.useMutation({
+        onMutate: async ({ eventId }) => {
+            if (!user?.id) return
+            await utils.mobile.event.myFavoriteIds.cancel({ userId: user.id })
+            const prev = utils.mobile.event.myFavoriteIds.getData({ userId: user.id }) ?? []
+            const next = prev.includes(eventId)
+                ? prev.filter(id => id !== eventId)
+                : [...prev, eventId]
+            utils.mobile.event.myFavoriteIds.setData({ userId: user.id }, next)
+            return { prev }
+        },
+        onError: (_err, _vars, ctx) => {
+            if (!user?.id || !ctx?.prev) return
+            utils.mobile.event.myFavoriteIds.setData({ userId: user.id }, ctx.prev)
+        },
+        onSettled: () => {
+            if (!user?.id) return
+            utils.mobile.event.myFavoriteIds.invalidate({ userId: user.id })
+            utils.mobile.event.listFavorites.invalidate({ userId: user.id })
+        },
+    })
+
+    function handleToggleLike() {
+        if (!user?.id) return
+        toggleFavorite.mutate({ userId: user.id, eventId: item.id })
+    }
 
     const badgeColor = DATE_COLORS[index % DATE_COLORS.length]!
     const categoryLabel = item.artists?.[0]?.name ?? 'Evento'
@@ -97,7 +132,8 @@ export default function EventCardHighlighted({ item, index = 0 }: Props) {
             {/* ── LIKE — top left ── */}
             <Pressable
                 hitSlop={8}
-                onPress={() => setLiked(v => !v)}
+                onPress={handleToggleLike}
+                disabled={!user?.id}
                 style={styles.likeBtn}
             >
                 <MaterialCommunityIcons

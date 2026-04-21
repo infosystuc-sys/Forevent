@@ -88,11 +88,7 @@ export default function InternalNavBar(
                         </Button>
                     </div>
                 }
-                <div>
-                    <h1 className="w-max">
-                        Version beta 10/02/2024
-                    </h1>
-                </div>
+
                 {options?.menu &&
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
