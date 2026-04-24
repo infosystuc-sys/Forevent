@@ -2,7 +2,7 @@ import { CreatePostSchema } from "@forevent/validators";
 import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { createTRPCRouter, mobileProtectedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
 
 export const userPurchaseRouter = createTRPCRouter({
   all: publicProcedure.input(z.object({ userId: z.string(), eventId: z.string() })).query(async ({ ctx, input }) => {
@@ -75,10 +75,10 @@ export const userPurchaseRouter = createTRPCRouter({
     return corrected
   }),
 
-  myPurchases: publicProcedure.input(z.object({ userId: z.string() })).query(async ({ ctx, input }) => {
+  myPurchases: mobileProtectedProcedure.query(async ({ ctx }) => {
     const rows = await ctx.prisma.userPurchase.findMany({
       where: {
-        ownerId: input.userId,
+        ownerId: ctx.user.id,
         discharged: true,
       },
       select: {

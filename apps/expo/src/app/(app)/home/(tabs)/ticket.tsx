@@ -274,8 +274,8 @@ export default function Page() {
   )
 
   const myPurchasesQuery = api.mobile.userPurchase.myPurchases.useQuery(
-    { userId: user!.id },
-    { staleTime: 0, refetchOnMount: 'always' },
+    undefined,
+    { staleTime: 0, refetchOnMount: 'always', enabled: !!user },
   )
 
   const isRefreshing = ticketsQuery.isFetching || myPurchasesQuery.isFetching

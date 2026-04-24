@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { removeStoreData } from '~/lib/storage';
+import React, { useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { useStorageState } from '~/hooks/useStorageState';
-import { sharedQueryClient } from '~/utils/api';
+import { sharedQueryClient, setAuthToken } from '~/utils/api';
+
+const USER_STORAGE_KEY = 'user';
 
 export type ActiveRole = 'USER' | 'EMPLOYEE';
 
@@ -22,7 +24,7 @@ interface AuthenticatedUser {
 
 interface Session {
     signIn: (props: SignInPayload) => void;
-    signOut: () => void;
+    signOut: () => Promise<void>;
     session?: string | null;
     isLoading: boolean;
     user: AuthenticatedUser | null;
@@ -32,7 +34,7 @@ interface Session {
 
 const AuthContext = React.createContext<Session>({
     signIn: () => null,
-    signOut: () => null,
+    signOut: async () => undefined,
     isLoading: false,
     user: null,
     session: null,
@@ -53,25 +55,54 @@ export function useSession() {
 }
 
 export function SessionProvider(props: React.PropsWithChildren) {
-    const [[isLoading, session], setSession] = useStorageState('session');
+    const [[isSessionLoading, session], setSession] = useStorageState('session');
     const [user, setUser] = useState<AuthenticatedUser | null>(null)
+    const [isUserLoading, setIsUserLoading] = useState(true)
     const [activeRole, setActiveRole] = useState<ActiveRole>('USER')
+
+    // Hidratar user desde SecureStore en cold start. Evita tener que pasar por validateSession cada vez.
+    useEffect(() => {
+        let cancelled = false;
+        SecureStore.getItemAsync(USER_STORAGE_KEY)
+            .then((raw) => {
+                if (cancelled) return
+                if (raw) {
+                    try {
+                        setUser(JSON.parse(raw) as AuthenticatedUser)
+                    } catch {
+                        // JSON corrupto → borrar y seguir como logged-out
+                        void SecureStore.deleteItemAsync(USER_STORAGE_KEY)
+                    }
+                }
+                setIsUserLoading(false)
+            })
+            .catch(() => {
+                if (!cancelled) setIsUserLoading(false)
+            });
+        return () => { cancelled = true };
+    }, [])
+
+    // Propagar el token al cliente tRPC cada vez que cambia la sesión.
+    useEffect(() => {
+        setAuthToken(session ?? null)
+    }, [session])
+
+    const isLoading = isSessionLoading || isUserLoading;
 
     return (
         <AuthContext.Provider value={{
-            signIn: (props) => {
-                setUser(props.user)
-                setSession(props.sessionId);
+            signIn: (payload) => {
+                setUser(payload.user)
+                setSession(payload.sessionId);
+                // Persistir user también para cold-start (evita round-trip a validateSession).
+                void SecureStore.setItemAsync(USER_STORAGE_KEY, JSON.stringify(payload.user))
             },
-            signOut: () => {
+            signOut: async () => {
                 setUser(null);
                 setSession(null);
                 setActiveRole('USER');
-                // Limpiar AsyncStorage para que cold-start no restaure la sesión anterior
-                void removeStoreData('session');
-                void removeStoreData('user');
-                // Limpiar caché de React Query para evitar datos del usuario anterior
-                // al iniciar sesión con una cuenta diferente
+                setAuthToken(null);
+                await SecureStore.deleteItemAsync(USER_STORAGE_KEY).catch(() => undefined);
                 sharedQueryClient?.clear();
             },
             session,

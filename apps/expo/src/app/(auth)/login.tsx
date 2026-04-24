@@ -14,7 +14,6 @@ import Logo from '~/assets/logo';
 import TextInput from '~/components/input';
 import { useSession } from "~/context/auth";
 import useTheme from "~/hooks/useTheme";
-import { storeObject, storeString } from "~/lib/storage";
 import { api } from "~/utils/api";
 
 const CELL_SIZE = 70;
@@ -106,8 +105,7 @@ const Page: React.FC = () => {
 
     const login = api.mobile.auth.login.useMutation({
         onSuccess: (res) => {
-            storeObject("user", res.user)
-            storeString("session", res.sessionId)
+            // signIn persiste user y session en SecureStore + setea el token en el tRPC client.
             signIn(res)
             router.replace("/(app)")
         },
@@ -504,7 +502,7 @@ const Page: React.FC = () => {
                                 }}
                                     onPress={() => {
                                         Keyboard.dismiss()
-                                        codeForm.handleSubmit(onCodeSubmit, onCodeError)
+                                        codeForm.handleSubmit(onCodeSubmit, onCodeError)()
                                     }}>
                                     {login.isPending ?
                                         <ActivityIndicator color={colors.text} size='small' />

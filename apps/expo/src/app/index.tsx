@@ -2,33 +2,35 @@ import { Redirect, router } from "expo-router";
 import { useEffect } from "react";
 import Loading from "~/components/loading";
 import { useSession } from "~/context/auth";
-import { getString, removeStoreData } from "~/lib/storage";
 import { api } from "~/utils/api";
 
 export default function Index() {
-	const { signIn, session } = useSession()
+	const { signIn, signOut, session, user, isLoading } = useSession()
 	const validateSession = api.mobile.auth.validateSession.useMutation({
 		onSuccess: (res) => {
-			console.log("success validate")
 			signIn(res)
 			router.replace("/(app)")
 		},
 		onError: () => {
-			removeStoreData('user')
-			removeStoreData('session')
+			void signOut()
 			router.replace('/(auth)/login')
 		}
 	})
 
 	useEffect(() => {
-		const valid = async () => {
-			const session = await getString("session")
-			console.log("effect", session)
-			if (session) { validateSession.mutate({ sessionId: session }) } else { router.replace('/(auth)/login') }
+		if (isLoading) return
+		// Ya hay user hidratado en memoria → confiamos en SecureStore y saltamos la validación.
+		if (user) {
+			router.replace("/(app)")
+			return
 		}
-		valid()
-	}, [])
-	
+		// Hay session token pero falta user → revalidar contra backend.
+		if (session) {
+			validateSession.mutate({ sessionId: session })
+			return
+		}
+		router.replace('/(auth)/login')
+	}, [isLoading, user, session])
+
 	return <Loading />;
 };
-

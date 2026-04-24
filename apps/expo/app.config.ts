@@ -5,12 +5,13 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
-// Variable exacta: EXPO_PUBLIC_GOOGLE_MAPS_API_KEY (opcional; fallback para que el SDK nativo de Android siempre reciba una key)
-const envMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
-// Clave directa para Android: el SDK nativo la lee de android.config.googleMaps.apiKey en el build
-const ANDROID_GOOGLE_MAPS_API_KEY = envMapsKey || "AIzaSyAqSQqUDteS9L2j-svtzEvn_jo1G3kHzdw";
-if (!envMapsKey) {
-  console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY vacía; usando clave por defecto para Android.");
+// Google Maps key para Android. Obligatoria en todo build (dev e prod): el SDK nativo la lee
+// de android.config.googleMaps.apiKey. No se hardcodea un fallback porque terminaría committeado.
+const ANDROID_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
+if (!ANDROID_GOOGLE_MAPS_API_KEY) {
+  throw new Error(
+    "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY es obligatoria. Definila en .env (raíz del monorepo).",
+  );
 }
 
 const defineConfig = (): ExpoConfig => ({
@@ -22,7 +23,6 @@ const defineConfig = (): ExpoConfig => ({
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
-  entryPoint: "./index.ts",
   splash: {
     image: "./assets/icon.png",
     resizeMode: "contain",
@@ -35,32 +35,26 @@ const defineConfig = (): ExpoConfig => ({
   ios: {
     bundleIdentifier: "com.ssitgroup.forevent",
     supportsTablet: false,
-    "infoPlist": {
-      "UIBackgroundModes": [
-        "location",
-        "fetch",
-        "processing"
-      ],
-      "NSLocationWhenInUseUsageDescription": "text",
-      "NSLocationAlwaysAndWhenInUseUsageDescription": "text",
-      "NSLocationAlwaysUsageDescription": "text"
-    }
+    infoPlist: {
+      NSLocationWhenInUseUsageDescription:
+        "Forevent usa tu ubicación para mostrarte eventos cercanos en el mapa.",
+    },
   },
   android: {
     package: "com.ssitgroup.forevent",
-    usesCleartextTraffic: true,
+    // Solo permitir tráfico en claro en dev (Metro + 10.0.2.2). En prod exigimos HTTPS.
+    usesCleartextTraffic: process.env.NODE_ENV !== "production",
     adaptiveIcon: {
       foregroundImage: "./assets/icon.png",
       backgroundColor: "#000000",
     },
-    permissions: ["ACCESS_BACKGROUND_LOCATION", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
     config: {
-      // Google Maps API Key para react-native-maps en Android (SDK nativo la lee en el build).
       googleMaps: {
         apiKey: ANDROID_GOOGLE_MAPS_API_KEY,
       },
     },
-  },
+  } as any,
   extra: {
     eas: {
       projectId: "6de875d0-f6ce-461b-9ee6-4f169a1f328e",
