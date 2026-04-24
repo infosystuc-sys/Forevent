@@ -5,14 +5,28 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
+<<<<<<< HEAD
+// Google Maps key para Android. Validamos que exista en el entorno pero NO la
+// inyectamos directo en el config: pasamos el placeholder `${GOOGLE_MAPS_API_KEY}`
+// literal para que prebuild lo escriba tal cual en AndroidManifest.xml, y gradle
+// lo sustituya desde EXPO_PUBLIC_GOOGLE_MAPS_API_KEY vía manifestPlaceholders.
+// Así la key real nunca queda hardcodeada en archivos trackeados por git.
+const HAS_ANDROID_GOOGLE_MAPS_API_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
+if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY) {
+  throw new Error(
+    "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY es obligatoria. Definila en .env (raíz del monorepo).",
+  );
+=======
 // Google Maps key: obligatoria vía env. El manifest Android la inyecta con manifestPlaceholders.
 const ANDROID_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
 if (!ANDROID_GOOGLE_MAPS_API_KEY) {
   console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY no definida. Los mapas en Android no funcionarán.");
+>>>>>>> main
 }
+const ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER = "${GOOGLE_MAPS_API_KEY}";
 
 const defineConfig = (): ExpoConfig => ({
-  owner: "ascheladd",
+  owner: "infosystuc",
   name: "Forevent",
   slug: "forevent",
   scheme: "foreventapp",
@@ -20,7 +34,6 @@ const defineConfig = (): ExpoConfig => ({
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "dark",
-  entryPoint: "./index.ts",
   splash: {
     image: "./assets/icon.png",
     resizeMode: "contain",
@@ -33,6 +46,17 @@ const defineConfig = (): ExpoConfig => ({
   ios: {
     bundleIdentifier: "com.ssitgroup.forevent",
     supportsTablet: false,
+<<<<<<< HEAD
+    infoPlist: {
+      NSLocationWhenInUseUsageDescription:
+        "Forevent usa tu ubicación para mostrarte eventos cercanos en el mapa.",
+    },
+  },
+  android: {
+    package: "com.ssitgroup.forevent",
+    // Solo permitir tráfico en claro en dev (Metro + 10.0.2.2). En prod exigimos HTTPS.
+    usesCleartextTraffic: process.env.NODE_ENV !== "production",
+=======
     "infoPlist": {
       "NSLocationWhenInUseUsageDescription": "Forevent usa tu ubicación para mostrarte eventos cercanos.",
       "NSAppTransportSecurity": {
@@ -42,6 +66,7 @@ const defineConfig = (): ExpoConfig => ({
   },
   android: {
     package: "com.ssitgroup.forevent",
+>>>>>>> main
     adaptiveIcon: {
       foregroundImage: "./assets/icon.png",
       backgroundColor: "#000000",
@@ -49,15 +74,15 @@ const defineConfig = (): ExpoConfig => ({
     permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
     config: {
       googleMaps: {
-        apiKey: ANDROID_GOOGLE_MAPS_API_KEY,
+        apiKey: ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER,
       },
     },
-  },
+  } as any,
   extra: {
     eas: {
-      projectId: "6de875d0-f6ce-461b-9ee6-4f169a1f328e",
+      projectId: "cab98ce5-3435-47b3-b34b-ca8a40b95fd9",
     },
-    googleMapsApiKeyConfigured: !!ANDROID_GOOGLE_MAPS_API_KEY.trim(),
+    googleMapsApiKeyConfigured: HAS_ANDROID_GOOGLE_MAPS_API_KEY,
   },
   experiments: {
     tsconfigPaths: true,

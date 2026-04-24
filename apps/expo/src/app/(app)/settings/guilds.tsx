@@ -94,13 +94,13 @@ export default function Page() {
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-evenly', width: "100%" }}>
                                 <Pressable disabled={joinInvite.isPending} style={{ borderWidth: .5, borderColor: colors.primary, paddingVertical: 7.5, borderRadius: 10, paddingHorizontal: 20 }}
-                                    onPress={() => joinInvite.mutate({ joinInviteId: item.id, accept: false })} >
+                                    onPress={() => joinInvite.mutate({ joinInviteId: item.id, accept: false, userId: user!.id })} >
                                     <Text style={{ color: colors.text, fontSize: 14 }}>
                                         Rechazar
                                     </Text>
                                 </Pressable>
                                 <Pressable disabled={joinInvite.isPending} style={{ borderWidth: .5, borderColor: colors.primary, paddingVertical: 7.5, borderRadius: 10, paddingHorizontal: 20 }}
-                                    onPress={() => joinInvite.mutate({ joinInviteId: item.id, accept: true })} >
+                                    onPress={() => joinInvite.mutate({ joinInviteId: item.id, accept: true, userId: user!.id })} >
                                     <Text style={{ color: colors.text, fontSize: 14 }}>
                                         Aceptar
                                     </Text>

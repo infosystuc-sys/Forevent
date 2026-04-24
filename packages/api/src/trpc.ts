@@ -27,18 +27,57 @@ import { socket } from "./lib/socket"
  *
  * @see https://trpc.io/docs/server/context
  */
+/**
+ * Resuelve la sesión del mobile a partir del header `Authorization: Bearer <sessionId>`.
+ * El mobile no tiene cookies de NextAuth, así que envía el sessionId como bearer token y acá
+ * lo validamos contra la tabla Session. Devuelve `null` si no hay token, es inválido o expiró.
+ */
+async function resolveMobileSession(headers: Headers) {
+  const authz = headers.get("authorization");
+  if (!authz?.toLowerCase().startsWith("bearer ")) return null;
+  const sessionId = authz.slice(7).trim();
+  if (!sessionId) return null;
+
+  const row = await prisma.session.findUnique({
+    where: { id: sessionId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          about: true,
+          locale: true,
+          zoneinfo: true,
+        },
+      },
+    },
+  });
+
+  if (!row || !row.user) return null;
+  if (row.expiresAt.getTime() < Date.now()) return null;
+
+  return {
+    sessionId: row.id,
+    user: row.user,
+  };
+}
+
 export const createTRPCContext = async (opts: {
   headers: Headers;
   session: Session | null;
 }) => {
   const session = opts.session ?? (await auth());
+  const mobileSession = await resolveMobileSession(opts.headers);
   const source = opts.headers.get("x-trpc-source") ?? "unknown";
 
   return {
     session,
+    mobileSession,
     socket,
     prisma,
-    resend
+    resend,
   };
 };
 
@@ -96,7 +135,6 @@ export const publicProcedure = t.procedure;
  * @see https://trpc.io/docs/procedures
  */
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
-  // console.log("PROTECTED PROCEDURE", ctx.session, "llego sesion?")
   if (!ctx.session?.user) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
@@ -104,6 +142,28 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
     ctx: {
       // infers the `session` as non-nullable
       session: { ...ctx.session, user: ctx.session.user },
+    },
+  });
+});
+
+/**
+ * Mobile procedure
+ *
+ * Requiere un `Authorization: Bearer <sessionId>` válido (resuelto en createTRPCContext).
+ * Expone `ctx.user` para que los routers mobile tomen el userId del token en vez del input,
+ * evitando el patrón inseguro de que el cliente pase su propio `userId`.
+ */
+export const mobileProtectedProcedure = t.procedure.use(({ ctx, next }) => {
+  if (!ctx.mobileSession) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Sesión móvil inválida o expirada. Iniciá sesión de nuevo.",
+    });
+  }
+  return next({
+    ctx: {
+      mobileSession: ctx.mobileSession,
+      user: ctx.mobileSession.user,
     },
   });
 });
