@@ -5,14 +5,18 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
-// Google Maps key para Android. Obligatoria en todo build (dev e prod): el SDK nativo la lee
-// de android.config.googleMaps.apiKey. No se hardcodea un fallback porque terminaría committeado.
-const ANDROID_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
-if (!ANDROID_GOOGLE_MAPS_API_KEY) {
+// Google Maps key para Android. Validamos que exista en el entorno pero NO la
+// inyectamos directo en el config: pasamos el placeholder `${GOOGLE_MAPS_API_KEY}`
+// literal para que prebuild lo escriba tal cual en AndroidManifest.xml, y gradle
+// lo sustituya desde EXPO_PUBLIC_GOOGLE_MAPS_API_KEY vía manifestPlaceholders.
+// Así la key real nunca queda hardcodeada en archivos trackeados por git.
+const HAS_ANDROID_GOOGLE_MAPS_API_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
+if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY) {
   throw new Error(
     "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY es obligatoria. Definila en .env (raíz del monorepo).",
   );
 }
+const ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER = "${GOOGLE_MAPS_API_KEY}";
 
 const defineConfig = (): ExpoConfig => ({
   owner: "ascheladd",
@@ -51,7 +55,7 @@ const defineConfig = (): ExpoConfig => ({
     permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
     config: {
       googleMaps: {
-        apiKey: ANDROID_GOOGLE_MAPS_API_KEY,
+        apiKey: ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER,
       },
     },
   } as any,
@@ -59,7 +63,7 @@ const defineConfig = (): ExpoConfig => ({
     eas: {
       projectId: "6de875d0-f6ce-461b-9ee6-4f169a1f328e",
     },
-    googleMapsApiKeyConfigured: !!ANDROID_GOOGLE_MAPS_API_KEY.trim(),
+    googleMapsApiKeyConfigured: HAS_ANDROID_GOOGLE_MAPS_API_KEY,
   },
   experiments: {
     tsconfigPaths: true,
