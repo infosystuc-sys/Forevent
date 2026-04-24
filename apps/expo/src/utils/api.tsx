@@ -25,22 +25,14 @@ export function setAuthToken(token: string | null) {
 }
 
 const getBaseUrl = () => {
-<<<<<<< HEAD
   // Prod: obligatoria via env. Falla explícita si falta para evitar deployments apuntando a localhost.
-=======
-  // Production override (when running a build). Configurar en .env del monorepo.
->>>>>>> main
   const prodUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
   if (!__DEV__) {
     if (!prodUrl) {
-<<<<<<< HEAD
       throw new Error(
         "[api] EXPO_PUBLIC_API_URL no está definida. Configurala en el .env del build de producción.",
       );
-=======
-      throw new Error("EXPO_PUBLIC_API_URL no definida. Configura la URL del backend en .env antes del build.");
->>>>>>> main
     }
     return prodUrl;
   }
