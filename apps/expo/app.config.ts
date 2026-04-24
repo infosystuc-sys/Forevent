@@ -19,7 +19,7 @@ if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY) {
 const ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER = "${GOOGLE_MAPS_API_KEY}";
 
 const defineConfig = (): ExpoConfig => ({
-  owner: "ascheladd",
+  owner: "infosystuc",
   name: "Forevent",
   slug: "forevent",
   scheme: "foreventapp",
@@ -61,7 +61,7 @@ const defineConfig = (): ExpoConfig => ({
   } as any,
   extra: {
     eas: {
-      projectId: "6de875d0-f6ce-461b-9ee6-4f169a1f328e",
+      projectId: "cab98ce5-3435-47b3-b34b-ca8a40b95fd9",
     },
     googleMapsApiKeyConfigured: HAS_ANDROID_GOOGLE_MAPS_API_KEY,
   },
