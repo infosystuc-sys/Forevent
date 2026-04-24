@@ -1,0 +1,17 @@
+{
+  "ignore_dirs": [
+    "node_modules",
+    ".git",
+    ".turbo",
+    ".next",
+    ".expo",
+    "android",
+    "ios",
+    "build",
+    "dist",
+    ".cache",
+    ".vscode",
+    ".idea",
+    "packages/db/generated"
+  ]
+}
