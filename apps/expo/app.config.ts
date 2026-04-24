@@ -5,6 +5,7 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
+<<<<<<< HEAD
 // Google Maps key para Android. Validamos que exista en el entorno pero NO la
 // inyectamos directo en el config: pasamos el placeholder `${GOOGLE_MAPS_API_KEY}`
 // literal para que prebuild lo escriba tal cual en AndroidManifest.xml, y gradle
@@ -15,6 +16,12 @@ if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY) {
   throw new Error(
     "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY es obligatoria. Definila en .env (raíz del monorepo).",
   );
+=======
+// Google Maps key: obligatoria vía env. El manifest Android la inyecta con manifestPlaceholders.
+const ANDROID_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
+if (!ANDROID_GOOGLE_MAPS_API_KEY) {
+  console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY no definida. Los mapas en Android no funcionarán.");
+>>>>>>> main
 }
 const ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER = "${GOOGLE_MAPS_API_KEY}";
 
@@ -39,6 +46,7 @@ const defineConfig = (): ExpoConfig => ({
   ios: {
     bundleIdentifier: "com.ssitgroup.forevent",
     supportsTablet: false,
+<<<<<<< HEAD
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
         "Forevent usa tu ubicación para mostrarte eventos cercanos en el mapa.",
@@ -48,6 +56,17 @@ const defineConfig = (): ExpoConfig => ({
     package: "com.ssitgroup.forevent",
     // Solo permitir tráfico en claro en dev (Metro + 10.0.2.2). En prod exigimos HTTPS.
     usesCleartextTraffic: process.env.NODE_ENV !== "production",
+=======
+    "infoPlist": {
+      "NSLocationWhenInUseUsageDescription": "Forevent usa tu ubicación para mostrarte eventos cercanos.",
+      "NSAppTransportSecurity": {
+        "NSAllowsArbitraryLoads": false
+      }
+    }
+  },
+  android: {
+    package: "com.ssitgroup.forevent",
+>>>>>>> main
     adaptiveIcon: {
       foregroundImage: "./assets/icon.png",
       backgroundColor: "#000000",
