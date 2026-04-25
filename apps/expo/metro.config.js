@@ -32,8 +32,13 @@ function withMonorepoPaths(config) {
   const projectRoot = __dirname;
   const workspaceRoot = path.resolve(projectRoot, "../..");
 
-  // #1 - Watch all files in the monorepo
-  config.watchFolders = [workspaceRoot];
+  // #1 - Watch solo paquetes fuente del monorepo. NO watchear node_modules ni apps/nextjs:
+  // en Windows sin watchman el node-crawler timeouteaba (metro-file-map MAX_WAIT_TIME).
+  // Los node_modules siguen RESOLVIENDO via nodeModulesPaths, solo no se "watch"-ean.
+  config.watchFolders = [
+    path.resolve(workspaceRoot, "packages"),
+    path.resolve(workspaceRoot, "tooling"),
+  ];
 
   // #2 - Resolve modules within the project's `node_modules` first, then all monorepo modules
   config.resolver.nodeModulesPaths = [
@@ -41,11 +46,17 @@ function withMonorepoPaths(config) {
     path.resolve(workspaceRoot, "node_modules"),
   ];
 
-  // #3 - SOLUCIÓN DEFINITIVA: Bloquear la carpeta de Next.js
-  // Esto evita que Metro intente leer el build de la web (.next) o assets gigantes de la web
+  // #3 - Excluir paths pesados del file-map (se aplica como ignorePattern al watcher).
+  // Incluimos node_modules internos del root y apps/nextjs build artifacts.
   config.resolver.blockList = exclusionList([
     /.*\/apps\/nextjs\/.*/,
     /.*\.next\/.*/,
+    /.*\/\.turbo\/.*/,
+    /.*\/\.git\/.*/,
+    /.*\/\.cache\/.*/,
+    /.*\/apps\/auth-proxy\/.*/,
+    // Deep pnpm paths (symlinks) – ignoramos para el crawler del watcher
+    /.*\/\.pnpm\/.*\/node_modules\/.*\/node_modules\/.*/,
   ]);
 
   config.transformer = {

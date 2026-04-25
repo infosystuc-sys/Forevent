@@ -1,36 +1,42 @@
-import { Redirect, router } from "expo-router";
-import { useEffect } from "react";
+import { Redirect } from "expo-router";
+import { useEffect, useState } from "react";
 import Loading from "~/components/loading";
 import { useSession } from "~/context/auth";
 import { api } from "~/utils/api";
 
 export default function Index() {
 	const { signIn, signOut, session, user, isLoading } = useSession()
+	// "idle" mientras decidimos; luego uno de los destinos.
+	// Usamos <Redirect> declarativo en vez de router.replace imperativo para evitar
+	// "Attempted to navigate before mounting the Root Layout" — el router recién está
+	// "ready" después del primer render del Slot.
+	const [target, setTarget] = useState<"app" | "login" | null>(null)
+
 	const validateSession = api.mobile.auth.validateSession.useMutation({
 		onSuccess: (res) => {
 			signIn(res)
-			router.replace("/(app)")
+			setTarget("app")
 		},
 		onError: () => {
 			void signOut()
-			router.replace('/(auth)/login')
+			setTarget("login")
 		}
 	})
 
 	useEffect(() => {
 		if (isLoading) return
-		// Ya hay user hidratado en memoria → confiamos en SecureStore y saltamos la validación.
 		if (user) {
-			router.replace("/(app)")
+			setTarget("app")
 			return
 		}
-		// Hay session token pero falta user → revalidar contra backend.
 		if (session) {
 			validateSession.mutate({ sessionId: session })
 			return
 		}
-		router.replace('/(auth)/login')
+		setTarget("login")
 	}, [isLoading, user, session])
 
+	if (target === "app") return <Redirect href="/(app)" />
+	if (target === "login") return <Redirect href="/(auth)/login" />
 	return <Loading />;
 };

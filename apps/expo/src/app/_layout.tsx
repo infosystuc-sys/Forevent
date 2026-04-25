@@ -11,26 +11,7 @@ import { useColorScheme } from "nativewind";
 import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
 import { View, useWindowDimensions } from "react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-
-class GestureRootErrorBoundary extends React.Component<
-  { children: ReactNode },
-  { useFallback: boolean }
-> {
-  state = { useFallback: false };
-  static getDerivedStateFromError = () => ({ useFallback: true });
-  render() {
-    if (this.state.useFallback) {
-      return <View style={{ flex: 1 }}>{this.props.children}</View>;
-    }
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        {this.props.children}
-      </GestureHandlerRootView>
-    );
-  }
-}
 import { StyleSheet } from "react-native";
 import { SplashScreen } from "expo-router";
 import { Animated } from "react-native";
@@ -177,8 +158,8 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <TRPCProvider>
-      <GestureRootErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <TRPCProvider>
         <SessionProvider>
           <ThemeProvider value={DarkTheme}>
             <AnimatedSplashScreen fontsLoaded={fontsLoaded}>
@@ -189,7 +170,7 @@ export default function RootLayout() {
           </ThemeProvider>
         </SessionProvider>
         <StatusBar />
-      </GestureRootErrorBoundary>
-    </TRPCProvider>
+      </TRPCProvider>
+    </GestureHandlerRootView>
   );
 }

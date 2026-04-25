@@ -10,19 +10,13 @@ echo  ===================================================
 echo.
 
 :: Configurar adb reverse para ambos puertos
-echo [1/3] Configurando adb reverse...
+echo [1/2] Configurando adb reverse...
 adb reverse tcp:8081 tcp:8082
 adb reverse tcp:8082 tcp:8082
 
-:: Limpiar cache de Metro
-echo [2/3] Limpiando cache de Metro...
-if exist "%ROOT%\apps\expo\node_modules\.cache\metro" (
-    rmdir /s /q "%ROOT%\apps\expo\node_modules\.cache\metro"
-)
-
-:: Iniciar Metro con localhost forzado
-echo [3/3] Iniciando Metro...
+:: Iniciar Metro con cache (arranque rapido)
+echo [2/2] Iniciando Metro...
 echo.
 cd /d "%ROOT%\apps\expo"
 set "REACT_NATIVE_PACKAGER_HOSTNAME=localhost"
-npx expo start --dev-client --clear --port 8082
+npx expo start --dev-client --port 8082
