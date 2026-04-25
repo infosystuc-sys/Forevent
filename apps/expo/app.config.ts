@@ -18,6 +18,16 @@ if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY) {
 }
 const ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER = "${GOOGLE_MAPS_API_KEY}";
 
+// Google Maps key para iOS. En iOS no hay manifestPlaceholders: la key se inyecta
+// directamente en AppDelegate.swift por el plugin with-maps.js en tiempo de prebuild.
+// La carpeta ios/ está en .gitignore, por lo que la key nunca queda en el repo.
+const IOS_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_KEY?.trim() ?? "";
+if (!IOS_GOOGLE_MAPS_API_KEY) {
+  throw new Error(
+    "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_IOS_KEY es obligatoria. Definila en .env (raíz del monorepo).",
+  );
+}
+
 const defineConfig = (): ExpoConfig => ({
   owner: "infosystuc",
   name: "Forevent",
@@ -46,6 +56,9 @@ const defineConfig = (): ExpoConfig => ({
         NSAllowsArbitraryLoads: false,
       },
     },
+    config: {
+      googleMapsApiKey: IOS_GOOGLE_MAPS_API_KEY,
+    },
   },
   android: {
     package: "com.ssitgroup.forevent",
@@ -67,6 +80,7 @@ const defineConfig = (): ExpoConfig => ({
       projectId: "cab98ce5-3435-47b3-b34b-ca8a40b95fd9",
     },
     googleMapsApiKeyConfigured: HAS_ANDROID_GOOGLE_MAPS_API_KEY,
+    googleMapsIosApiKeyConfigured: !!IOS_GOOGLE_MAPS_API_KEY,
   },
   experiments: {
     tsconfigPaths: true,
