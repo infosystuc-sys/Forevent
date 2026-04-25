@@ -104,9 +104,12 @@ export default function Page() {
 
   const store = api.mobile.product.onEvent.useQuery({ eventId: eventId! as string })
 
+  const utils = api.useUtils()
   const purchase = api.mobile.purchase.products.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       cartForm.setValue('cart', [])
+      // Refetch explícito (cubre MIUI/Xiaomi silently-blocked refetch tras invalidate).
+      await utils.mobile.userPurchase.myPurchases.refetch()
       handleClosePress()
     },
     onError: () => {

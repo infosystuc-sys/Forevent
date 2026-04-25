@@ -63,7 +63,25 @@ export let sharedQueryClient: QueryClient;
  */
 export function TRPCProvider(props: { children: React.ReactNode }) {
   const [queryClient] = useState(() => {
-    const client = new QueryClient();
+    // Defaults pensados para redes inestables y devices con optimización agresiva
+    // (MIUI/Xiaomi): retries con backoff exponencial, networkMode online para no
+    // ejecutar queries cuando se detecta offline (evita errores que el user no
+    // puede accionar), y refetch automático al recuperar foco/red.
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: 3,
+          retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+          networkMode: "online",
+          refetchOnReconnect: true,
+        },
+        mutations: {
+          retry: 2,
+          retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5_000),
+          networkMode: "online",
+        },
+      },
+    });
     sharedQueryClient = client;
     return client;
   });

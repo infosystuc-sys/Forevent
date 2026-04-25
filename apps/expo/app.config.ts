@@ -68,7 +68,13 @@ const defineConfig = (): ExpoConfig => ({
       foregroundImage: "./assets/icon.png",
       backgroundColor: "#000000",
     },
-    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+    permissions: [
+      "ACCESS_COARSE_LOCATION",
+      "ACCESS_FINE_LOCATION",
+      // Permite a la app abrir el diálogo de "ignorar optimización de batería"
+      // (necesario en MIUI/Xiaomi para que el OS no corte network requests).
+      "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+    ],
     config: {
       googleMaps: {
         apiKey: ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER,

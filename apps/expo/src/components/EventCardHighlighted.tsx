@@ -69,10 +69,15 @@ export default function EventCardHighlighted({ item, index = 0 }: Props) {
             if (!user?.id || !ctx?.prev) return
             utils.mobile.event.myFavoriteIds.setData({ userId: user.id }, ctx.prev)
         },
-        onSettled: () => {
+        onSettled: async () => {
             if (!user?.id) return
-            utils.mobile.event.myFavoriteIds.invalidate({ userId: user.id })
-            utils.mobile.event.listFavorites.invalidate({ userId: user.id })
+            // Refetch explícito (await) en lugar de invalidate solo. En MIUI/Xiaomi
+            // el invalidate dispara un refetch que el OS bloquea silenciosamente,
+            // dejando el optimistic update sin confirmar contra el servidor.
+            await Promise.all([
+                utils.mobile.event.myFavoriteIds.refetch({ userId: user.id }),
+                utils.mobile.event.listFavorites.refetch({ userId: user.id }),
+            ])
         },
     })
 

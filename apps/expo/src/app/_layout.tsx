@@ -18,6 +18,7 @@ import { Animated } from "react-native";
 import * as SecureStore from 'expo-secure-store';
 import * as Font from 'expo-font';
 import WelcomeScreen, { HIDE_WELCOME_KEY } from "~/components/WelcomeScreen";
+import DeviceOptimizationPrompt from "~/components/DeviceOptimizationPrompt";
 
 const FONTS = {
   Montserrat_700Bold: require('../assets/fonts/Montserrat_700Bold.ttf'),
@@ -165,6 +166,11 @@ export default function RootLayout() {
             <AnimatedSplashScreen fontsLoaded={fontsLoaded}>
               <WelcomeGate>
                 <Slot />
+                {/* Modal de primera vez para deshabilitar optimización de
+                    batería en MIUI/Xiaomi y demás OEMs agresivos. Se monta
+                    siempre pero solo aparece una vez (persistencia en
+                    SecureStore). */}
+                <DeviceOptimizationPrompt />
               </WelcomeGate>
             </AnimatedSplashScreen>
           </ThemeProvider>

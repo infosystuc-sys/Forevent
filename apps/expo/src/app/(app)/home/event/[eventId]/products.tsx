@@ -173,9 +173,13 @@ export default function ProductsScreen() {
     // ── Purchase mutation ────────────────────────────────────────────────────
     const utils = api.useUtils()
     const purchaseMutation = api.mobile.purchase.products.useMutation({
-        onSuccess: () => {
+        onSuccess: async () => {
             setCart({})
-            utils.mobile.userPurchase.myPurchases.invalidate()
+            // Refetch explícito (await) en lugar de invalidate. Garantiza que la lista
+            // de "Mis compras" tenga el dato nuevo antes de mostrar el alert al user.
+            // Sin esto, en MIUI/Xiaomi el invalidate disparaba un refetch que el OS
+            // bloqueaba silenciosamente y el user no veía la compra recién hecha.
+            await utils.mobile.userPurchase.myPurchases.refetch()
             Alert.alert(
                 '¡Pedido confirmado!',
                 'Tu pedido fue registrado exitosamente. Presentá el QR en el mostrador.',
