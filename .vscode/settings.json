@@ -35,5 +35,8 @@
   },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
-  }
+  },
+  "java.gradle.buildServer.enabled": "off",
+  "java.autobuild.enabled": false,
+  "java.compile.nullAnalysis.mode": "disabled"
 }

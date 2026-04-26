@@ -39,6 +39,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import ErrorBanner from '~/components/ErrorBanner'
 import Loading from '~/components/loading'
 import { TicketItemCard, type TicketItem } from '~/components/TicketItemCard'
 import { useSession } from '~/context/auth'
@@ -279,12 +280,16 @@ export default function Page() {
   )
 
   const isRefreshing = ticketsQuery.isFetching || myPurchasesQuery.isFetching
-  const onRefresh = () => {
-    utils.mobile.userTicket.list.invalidate()
-    utils.mobile.userPurchase.myPurchases.invalidate()
-    ticketsQuery.refetch()
-    myPurchasesQuery.refetch()
+  const onRefresh = async () => {
+    // Refetch explícito esperando el resultado (no solo invalidate). En MIUI/Xiaomi
+    // el invalidate solo no garantiza que el refetch llegue al servidor — al hacer
+    // refetch directo el ciclo retry/error queda visible al usuario.
+    await Promise.all([
+      ticketsQuery.refetch(),
+      myPurchasesQuery.refetch(),
+    ])
   }
+  const hasFetchError = ticketsQuery.isError || myPurchasesQuery.isError
 
   const allTickets = ticketsQuery.data ?? []
 
@@ -389,6 +394,16 @@ export default function Page() {
             </View>
           )}
         </View>
+
+        {/* ── Error banner (queries fallidas) ── */}
+        {hasFetchError && (
+          <ErrorBanner
+            onRetry={() => {
+              void ticketsQuery.refetch()
+              void myPurchasesQuery.refetch()
+            }}
+          />
+        )}
 
         {/* ── Tab bar ── */}
         <View style={styles.tabBar}>

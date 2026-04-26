@@ -5,7 +5,6 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
-<<<<<<< HEAD
 // Google Maps key para Android. Validamos que exista en el entorno pero NO la
 // inyectamos directo en el config: pasamos el placeholder `${GOOGLE_MAPS_API_KEY}`
 // literal para que prebuild lo escriba tal cual en AndroidManifest.xml, y gradle
@@ -16,14 +15,18 @@ if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY) {
   throw new Error(
     "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY es obligatoria. Definila en .env (raíz del monorepo).",
   );
-=======
-// Google Maps key: obligatoria vía env. El manifest Android la inyecta con manifestPlaceholders.
-const ANDROID_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
-if (!ANDROID_GOOGLE_MAPS_API_KEY) {
-  console.warn("[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY no definida. Los mapas en Android no funcionarán.");
->>>>>>> main
 }
 const ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER = "${GOOGLE_MAPS_API_KEY}";
+
+// Google Maps key para iOS. En iOS no hay manifestPlaceholders: la key se inyecta
+// directamente en AppDelegate.swift por el plugin with-maps.js en tiempo de prebuild.
+// La carpeta ios/ está en .gitignore, por lo que la key nunca queda en el repo.
+const IOS_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_KEY?.trim() ?? "";
+if (!IOS_GOOGLE_MAPS_API_KEY) {
+  throw new Error(
+    "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_IOS_KEY es obligatoria. Definila en .env (raíz del monorepo).",
+  );
+}
 
 const defineConfig = (): ExpoConfig => ({
   owner: "infosystuc",
@@ -46,32 +49,32 @@ const defineConfig = (): ExpoConfig => ({
   ios: {
     bundleIdentifier: "com.ssitgroup.forevent",
     supportsTablet: false,
-<<<<<<< HEAD
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
         "Forevent usa tu ubicación para mostrarte eventos cercanos en el mapa.",
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: false,
+      },
+    },
+    config: {
+      googleMapsApiKey: IOS_GOOGLE_MAPS_API_KEY,
     },
   },
   android: {
     package: "com.ssitgroup.forevent",
     // Solo permitir tráfico en claro en dev (Metro + 10.0.2.2). En prod exigimos HTTPS.
     usesCleartextTraffic: process.env.NODE_ENV !== "production",
-=======
-    "infoPlist": {
-      "NSLocationWhenInUseUsageDescription": "Forevent usa tu ubicación para mostrarte eventos cercanos.",
-      "NSAppTransportSecurity": {
-        "NSAllowsArbitraryLoads": false
-      }
-    }
-  },
-  android: {
-    package: "com.ssitgroup.forevent",
->>>>>>> main
     adaptiveIcon: {
       foregroundImage: "./assets/icon.png",
       backgroundColor: "#000000",
     },
-    permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+    permissions: [
+      "ACCESS_COARSE_LOCATION",
+      "ACCESS_FINE_LOCATION",
+      // Permite a la app abrir el diálogo de "ignorar optimización de batería"
+      // (necesario en MIUI/Xiaomi para que el OS no corte network requests).
+      "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+    ],
     config: {
       googleMaps: {
         apiKey: ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER,
@@ -83,6 +86,7 @@ const defineConfig = (): ExpoConfig => ({
       projectId: "cab98ce5-3435-47b3-b34b-ca8a40b95fd9",
     },
     googleMapsApiKeyConfigured: HAS_ANDROID_GOOGLE_MAPS_API_KEY,
+    googleMapsIosApiKeyConfigured: !!IOS_GOOGLE_MAPS_API_KEY,
   },
   experiments: {
     tsconfigPaths: true,

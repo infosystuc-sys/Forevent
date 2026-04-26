@@ -562,9 +562,10 @@ export default function Page() {
   })
 
   const purchaseMutation = api.mobile.purchase.products.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       setCart({})
-      utils.mobile.userPurchase.myPurchases.invalidate()
+      // Refetch explícito en lugar de invalidate (cubre MIUI silently-blocked refetch).
+      await utils.mobile.userPurchase.myPurchases.refetch()
       Alert.alert(
         '¡Pedido confirmado!',
         'Tu pedido fue registrado exitosamente. Presentá el QR en el mostrador.',

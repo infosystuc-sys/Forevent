@@ -26,6 +26,9 @@ expo-env.d.ts
 *.mobileprovision
 *.apk
 *.aab
+# Carpeta nativa iOS generada por expo prebuild — no se commitea porque
+# AppDelegate.swift contiene la Maps API key inyectada desde .env
+apps/expo/ios/
 
 # 🗄️ Database (Prisma & SQLite)
 .prisma/
