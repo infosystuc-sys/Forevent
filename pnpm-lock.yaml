@@ -23,6 +23,9 @@ importers:
 
   .:
     devDependencies:
+      '@t3-oss/env-nextjs':
+        specifier: ^0.7.1
+        version: 0.7.3(typescript@5.7.3)(zod@3.24.2)
       '@tanstack/react-query':
         specifier: 5.18.0
         version: 5.18.0(react@18.2.0)
@@ -47,6 +50,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.7.3
+      zod:
+        specifier: ^3.22.4
+        version: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
 
   apps/auth-proxy:
     dependencies:
@@ -9829,7 +9835,6 @@ packages:
     dependencies:
       typescript: 5.7.3
       zod: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
-    dev: false
 
   /@t3-oss/env-nextjs@0.7.3(typescript@5.7.3)(zod@3.24.2):
     resolution: {integrity: sha512-90TNffS17vjkQwfYyMUb4Zw9yqHwFV40f78qFug4JiQa5+N6DydTdlLOpzOcj8Cna/qpAVDwMSypofF/TVQDuA==}
@@ -9843,7 +9848,6 @@ packages:
       '@t3-oss/env-core': 0.7.3(typescript@5.7.3)(zod@3.24.2)
       typescript: 5.7.3
       zod: 3.24.2(patch_hash=vjzxpwkhosdol5xjjyouw2sw7a)
-    dev: false
 
   /@tanstack/query-core@5.18.0:
     resolution: {integrity: sha512-8c6nxeAnGHxIDZIyDmHdmgFt4D+LprAQaJmjsnM4szcIjsWOyFlzxdqQUuQ/XuQRvUgqYaqlJTtDADlSS7pTPQ==}
