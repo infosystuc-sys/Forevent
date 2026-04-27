@@ -54,7 +54,7 @@ const Page: React.FC = () => {
     const { colors } = useTheme()
     const { signIn, session, user } = useSession()
     const insets = useSafeAreaInsets();
-    const loginSnapPoints = useMemo(() => ["40%"], [])
+    const loginSnapPoints = useMemo(() => ["60%"], [])
     const codeSnapPoints = useMemo(() => ["100%"], [])
     const [value, setValue] = useState<string>('');
     const [timerCount, setTimer] = useState(60)
@@ -395,7 +395,6 @@ const Page: React.FC = () => {
                             keyboardShouldPersistTaps="always"
                             keyboardDismissMode={"interactive"}
                             overScrollMode={"never"}
-                            scrollEnabled={false}
                             style={{ paddingHorizontal: 20 }}
                         >
                             <Text numberOfLines={2} style={{ fontWeight: "800", fontSize: 25, lineHeight: 50, letterSpacing: -1, color: colors.text }}>
