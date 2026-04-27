@@ -75,6 +75,16 @@ function AnimatedSplashScreen({ children, fontsLoaded }: { children: React.React
   const [isSplashAnimationComplete, setAnimationComplete] = useState(false);
   const isAppReady = fontsLoaded && isVideoLoaded;
 
+  // Fallback: si el video no carga en 5 s (fallo silencioso en MIUI/Xiaomi),
+  // forzamos isVideoLoaded=true e isSplashVideoComplete=true para no bloquear.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setVideoLoaded(true);
+      setSplashVideoComplete(true);
+    }, 5000);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     if (isAppReady && isSplashVideoComplete) {
       Animated.timing(animation, {
