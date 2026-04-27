@@ -210,3 +210,6 @@ export const {
 
   session: { strategy: "jwt" },
 });
+
+// Re-export helper para verificar Google ID tokens (usado por mobile signInWithGoogle).
+export { verifyGoogleIdToken, type GoogleProfile } from "./google";
