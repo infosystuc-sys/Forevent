@@ -19,6 +19,17 @@ import * as SecureStore from 'expo-secure-store';
 import * as Font from 'expo-font';
 import WelcomeScreen, { HIDE_WELCOME_KEY } from "~/components/WelcomeScreen";
 import DeviceOptimizationPrompt from "~/components/DeviceOptimizationPrompt";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
+
+// Configuración global del SDK de Google Sign-In.
+// Se ejecuta una sola vez al cargarse el módulo (antes del primer render del Root).
+// El webClientId firma el ID token (aud claim del JWT) — debe coincidir con la
+// audience que el backend valida en verifyGoogleIdToken.
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_OAUTH_WEB_CLIENT_ID,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_OAUTH_IOS_CLIENT_ID,
+  offlineAccess: false,
+});
 
 const FONTS = {
   Montserrat_700Bold: require('../assets/fonts/Montserrat_700Bold.ttf'),
