@@ -48,9 +48,12 @@ export function useStorageState(key: string): UseStateHook<string> {
         console.error('Local storage is unavailable:', e);
       }
     } else {
-      SecureStore.getItemAsync(key).then(value => {
-        setState(value);
-      });
+      // Timeout de 4 s: en MIUI/Xiaomi el Keystore puede colgar tras reinstalar.
+      // Si no resuelve a tiempo, tratamos como null (no hay sesión guardada).
+      const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 4000));
+      Promise.race([SecureStore.getItemAsync(key), timeout])
+        .then(value => setState(value))
+        .catch(() => setState(null));
     }
   }, [key]);
 
