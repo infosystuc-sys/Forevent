@@ -92,10 +92,6 @@ android {
         versionName "0.1.0"
 
         buildConfigField("boolean", "REACT_NATIVE_UNSTABLE_USE_RUNTIME_SCHEDULER_ALWAYS", (findProperty("reactNative.unstable_useRuntimeSchedulerAlways") ?: true).toString())
-
-        // Google Maps API key inyectada desde el entorno para evitar hardcodeo en AndroidManifest.xml.
-        // En dev la carga `dotenv -e .env` del script `dev`; en EAS Build viene de env vars del proyecto.
-        // Fallback a gradle.properties (findProperty) para overrides locales.
         manifestPlaceholders = [
             GOOGLE_MAPS_API_KEY: (System.getenv("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY") ?: findProperty("GOOGLE_MAPS_API_KEY") ?: "")
         ]
