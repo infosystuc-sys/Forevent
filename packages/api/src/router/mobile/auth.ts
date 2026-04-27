@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
 import { NOREPLY_EMAIL, dayjs } from "../../lib/utils";
+import { verifyGoogleIdToken } from "@forevent/auth";
 import ValidationCodeEmailTemplate from "@forevent/ui/validationcodeemail";
 
 const BCRYPT_ROUNDS = 12;
@@ -482,6 +483,109 @@ export const authRouter = createTRPCRouter({
 
     return { success: true };
   }),
+
+  /**
+   * Login con Google Sign-In nativo.
+   *
+   * El cliente (mobile) obtiene un ID token del SDK de Google Sign-In del device
+   * y lo manda acá. Verificamos el token contra Google, buscamos/creamos el User
+   * por email, creamos una Session y devolvemos sessionId — exactamente igual que
+   * el flujo de email+code, así el cliente lo trata de forma idéntica.
+   *
+   * Compatibilidad con login email+code:
+   *   · Si el user ya tenía cuenta con email+code y se loguea con Google con el
+   *     MISMO email, encontramos al user existente (match por email único) y NO
+   *     duplicamos la cuenta. Las dos formas de login conviven sobre el mismo user.
+   *   · La password queda como estaba (si la tenía) o como hash random (si es user
+   *     creado por Google) — los users de Google nunca usan la password directamente.
+   */
+  signInWithGoogle: publicProcedure
+    .input(z.object({ idToken: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      let profile;
+      try {
+        profile = await verifyGoogleIdToken(input.idToken);
+      } catch (err: any) {
+        console.error("[signInWithGoogle] Token verification failed:", err.message);
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "El token de Google es inválido o expiró. Volvé a intentar.",
+        });
+      }
+
+      if (!profile.emailVerified) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Tu cuenta de Google no tiene email verificado.",
+        });
+      }
+
+      let user = await ctx.prisma.user.findUnique({
+        where: { email: profile.email },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          locale: true,
+          zoneinfo: true,
+          about: true,
+        },
+      });
+
+      if (!user) {
+        // Primer login con Google → crear user. La password es un hash random que
+        // nunca se va a usar (el user solo se loguea por Google), pero el schema
+        // requiere el campo. emailVerified=true porque Google ya lo verificó.
+        const randomPassword = randomBytes(32).toString("hex");
+        const hashedPassword = await bcrypt.hash(randomPassword, BCRYPT_ROUNDS);
+
+        user = await ctx.prisma.user.create({
+          data: {
+            email: profile.email,
+            name: profile.name ?? profile.email.split("@")[0]!,
+            image: profile.picture ?? DEFAULT_IMAGE,
+            password: hashedPassword,
+            emailVerified: true,
+            locale: "es-AR",
+            zoneinfo: "America/Argentina/Buenos_Aires",
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            locale: true,
+            zoneinfo: true,
+            about: true,
+          },
+        });
+      } else if (!user.image && profile.picture) {
+        // User existía (creado por email+code) sin foto → completar con la de Google.
+        user = await ctx.prisma.user.update({
+          where: { id: user.id },
+          data: { image: profile.picture },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            locale: true,
+            zoneinfo: true,
+            about: true,
+          },
+        });
+      }
+
+      const session = await ctx.prisma.session.create({
+        data: {
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30), // 30 días
+        },
+      });
+
+      return { user, sessionId: session.id };
+    }),
 
   resetPassword: publicProcedure.input(z.object({
     token: z.string().min(1, { message: "Token requerido" }),

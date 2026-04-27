@@ -127,6 +127,15 @@ const defineConfig = (): ExpoConfig => ({
       }
     ],
     "expo-router",
+    [
+      "@react-native-google-signin/google-signin",
+      {
+        // URL scheme para iOS (formato com.googleusercontent.apps.<ID>).
+        // El plugin escribe el CFBundleURLSchemes en Info.plist al hacer prebuild.
+        // En Android no hace falta config extra (autolinking).
+        iosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_OAUTH_IOS_URL_SCHEME,
+      },
+    ],
     "./expo-plugins/with-gesture-handler.js",
     "./expo-plugins/with-maps.js",
     "./expo-plugins/with-modify-gradle.js",

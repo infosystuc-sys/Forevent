@@ -28,6 +28,16 @@ function withMaps(config) {
         `dependencies {\n    implementation project(':react-native-maps')`
       );
     }
+    if (!config.modResults.contents.includes("GOOGLE_MAPS_API_KEY")) {
+      const placeholder =
+        `        manifestPlaceholders = [\n` +
+        `            GOOGLE_MAPS_API_KEY: (System.getenv("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY") ?: findProperty("GOOGLE_MAPS_API_KEY") ?: "")\n` +
+        `        ]`;
+      config.modResults.contents = config.modResults.contents.replace(
+        /(buildConfigField\("boolean"[^\n]*\n)/,
+        `$1${placeholder}\n`
+      );
+    }
     return config;
   });
 

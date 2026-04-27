@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons, Octicons, SimpleLineIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Octicons, SimpleLineIcons, AntDesign } from '@expo/vector-icons';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ImageBackground } from "expo-image";
@@ -6,10 +6,11 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, FormProvider, SubmitErrorHandler, SubmitHandler, useForm } from 'react-hook-form';
-import { ActivityIndicator, Animated, Keyboard, Platform, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Keyboard, Platform, Pressable, Text, View } from "react-native";
 import { CodeField, Cursor, useBlurOnFulfill, useClearByFocusCell } from 'react-native-confirmation-code-field';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
+import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import Logo from '~/assets/logo';
 import TextInput from '~/components/input';
 import { useSession } from "~/context/auth";
@@ -115,6 +116,68 @@ const Page: React.FC = () => {
             }
         }
     })
+
+    /**
+     * Login con Google: el SDK nativo abre el selector de cuentas del device,
+     * obtiene un ID token de Google y lo manda al backend que verifica + crea/encuentra
+     * el User y devuelve sessionId — mismo contrato que el flujo email+code.
+     */
+    const signInWithGoogle = api.mobile.auth.signInWithGoogle.useMutation({
+        onSuccess: (res) => {
+            signIn(res)
+            router.replace("/(app)")
+        },
+        onError: (error) => {
+            Alert.alert(
+                "No se pudo iniciar sesión con Google",
+                error.message ?? "Intentá de nuevo en unos segundos.",
+            )
+        },
+    })
+
+    const [googleLoading, setGoogleLoading] = useState(false)
+
+    async function handleGoogleSignIn() {
+        if (googleLoading || signInWithGoogle.isPending) return
+        setGoogleLoading(true)
+        try {
+            await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true })
+            const result: any = await GoogleSignin.signIn()
+            // Distintas versiones del SDK exponen el idToken en lugares distintos.
+            const idToken: string | null =
+                result?.idToken ??
+                result?.data?.idToken ??
+                result?.user?.idToken ??
+                null
+            if (!idToken) {
+                throw new Error("No se obtuvo el token de Google. Revisá tu conexión.")
+            }
+            signInWithGoogle.mutate({ idToken })
+        } catch (e: any) {
+            // El SDK lanza códigos especiales cuando el user cancela o no hay Play Services.
+            if (
+                e?.code === statusCodes.SIGN_IN_CANCELLED ||
+                e?.code === "SIGN_IN_CANCELLED" ||
+                e?.code === "-5"
+            ) {
+                // Usuario cerró el selector: silenciar.
+                return
+            }
+            if (
+                e?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE ||
+                e?.code === "PLAY_SERVICES_NOT_AVAILABLE"
+            ) {
+                Alert.alert(
+                    "Google Play Services no disponible",
+                    "Tu dispositivo necesita Google Play Services actualizado para usar Google Sign-In.",
+                )
+                return
+            }
+            Alert.alert("Error", e?.message ?? "No se pudo iniciar sesión con Google.")
+        } finally {
+            setGoogleLoading(false)
+        }
+    }
 
     const [props, getCellOnLayoutHandler] = useClearByFocusCell({
         value,
@@ -393,6 +456,43 @@ const Page: React.FC = () => {
                                         </Text>
                                     )}
                                 </FormProvider>
+
+                                {/* ── Separador "o" ── */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
+                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' }} />
+                                    <Text style={{ color: 'rgba(255,255,255,0.55)', marginHorizontal: 12, fontSize: 12, letterSpacing: 1 }}>
+                                        O
+                                    </Text>
+                                    <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' }} />
+                                </View>
+
+                                {/* ── Botón Continuar con Google ── */}
+                                <Pressable
+                                    onPress={handleGoogleSignIn}
+                                    disabled={googleLoading || signInWithGoogle.isPending}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 12,
+                                        backgroundColor: '#ffffff',
+                                        borderRadius: 999,
+                                        height: 48,
+                                        paddingHorizontal: 16,
+                                        opacity: googleLoading || signInWithGoogle.isPending ? 0.6 : 1,
+                                    }}
+                                >
+                                    {googleLoading || signInWithGoogle.isPending ? (
+                                        <ActivityIndicator color="#000" size="small" />
+                                    ) : (
+                                        <>
+                                            <AntDesign name="google" size={18} color="#000" />
+                                            <Text style={{ color: '#000', fontSize: 15, fontWeight: '600' }}>
+                                                Continuar con Google
+                                            </Text>
+                                        </>
+                                    )}
+                                </Pressable>
                             </BottomSheetView>
                             <View style={{ height: 50 }} />
                         </BottomSheetScrollView>
