@@ -1,17 +1,16 @@
 import { auth } from '@forevent/auth';
+import { redirect } from 'next/navigation';
 import VerifyForm from '~/app/_components/auth/verify-form';
 import { api } from '~/trpc/server';
 
-export default async function Page({
-    params,
-    searchParams,
-}: {
-    params: { slug: string };
-    searchParams?: { [key: string]: string | string[] | undefined };
-}) {
+export default async function Page() {
     const session = await auth()
+    const email = session?.user?.email
+    if (!email) {
+        redirect('/login')
+    }
 
-    const isVerified = await api.web.auth.getIsVerified({ email: session?.user?.email!, type: "USER" })
+    const isVerified = await api.web.auth.getIsVerified({ email, type: "USER" })
 
     // const validation = await api.web.createValidation.mutate({ email: session?.user?.email!, type: "USER" })
 

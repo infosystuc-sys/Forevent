@@ -6,6 +6,7 @@ import * as z from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { EyeClosedIcon, EyeOpenIcon } from "@radix-ui/react-icons"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { signIn } from "next-auth/react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -56,6 +57,7 @@ const FormSchema = z.object({
 
 export function RegisterForm() {
     const [showPassword, setShowPassword] = React.useState<boolean>(false)
+    const router = useRouter()
 
     const form = useForm<z.infer<typeof FormSchema>>({
         resolver: zodResolver(FormSchema),
@@ -70,12 +72,20 @@ export function RegisterForm() {
 
     const createAccount = api.web.auth.register.useMutation({
         onSuccess: async () => {
-            await signIn("credentials", {
+            const signInResult = await signIn("credentials", {
                 email: form.getValues("email"),
                 password: form.getValues("password"),
                 internal: false,
-                callbackUrl: "/v1",
-            });
+                redirect: false,
+            })
+            if (signInResult?.error) {
+                toast.error("Cuenta creada", {
+                    description: "No se pudo iniciar sesión automáticamente. Probá entrar con tu correo y contraseña.",
+                    action: { label: "Ir a login", onClick: () => { router.push("/login") } },
+                })
+                return
+            }
+            router.push("/account/verifyemail")
         },
         onError: (error) => {
             if (error.data?.code === "CONFLICT") {
