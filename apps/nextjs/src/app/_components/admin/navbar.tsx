@@ -70,9 +70,9 @@ export default function AdminNavBar(
         await handleSignOut()
     }
 
-    const getGuilds = api.web.guild.getGuilds.useQuery({ email: session?.user.email! as string }, { initialData: guilds })
+    const getGuilds = api.web.guild.getGuilds.useQuery({ email: session?.user.email! as string }, { initialData: guilds, staleTime: 5 * 60_000 })
 
-    const getInvites = api.web.userOnGuild.getInvites.useQuery({ email: session?.user.email! as string }, { initialData: invites })
+    const getInvites = api.web.userOnGuild.getInvites.useQuery({ email: session?.user.email! as string }, { initialData: invites, staleTime: 5 * 60_000 })
 
     React.useEffect(() => {
         if (getGuilds.data.length > 0 && !params?.guildId) {
