@@ -6,9 +6,6 @@ import { Button } from "~/app/_components/ui/button";
 import { api } from '~/trpc/server';
 import { DataTable } from "./data-table";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 export default async function EmployeesPage({ params }: { params: { guildId: string } }) {
   const employees = await api.web.userOnGuild.getEmployees({ guildId: params.guildId })
 

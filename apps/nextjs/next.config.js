@@ -90,18 +90,21 @@ const config = {
         protocol: 'https',
         hostname: 'avatars.githubusercontent.com',
         port: '',
-        pathname: '/**'
+        pathname: '/**',
       },
+      // Supabase Storage (eventos, productos, usuarios)
       {
         protocol: 'https',
-        hostname: 'd2l7xb0l2x2ws7.cloudfront.net',
+        hostname: 'gjygyztidgdhmqjlxqjq.supabase.co',
         port: '',
-        pathname: '/**'
+        pathname: '/storage/v1/object/public/**',
       },
+      // Google OAuth profile pictures
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: '*.googleusercontent.com',
         port: '',
+        pathname: '/**',
       },
     ]
   },

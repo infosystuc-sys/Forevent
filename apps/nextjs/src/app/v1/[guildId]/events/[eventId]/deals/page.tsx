@@ -3,9 +3,6 @@ import { Button } from "~/app/_components/ui/button";
 import { api } from '~/trpc/server';
 import { DataTable } from "./data-table";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 export default async function productsPage({ params }: { params: { guildId: string, eventId: string } }) {
   const deals = await api.web.event.deals({ eventId: params.eventId })
 

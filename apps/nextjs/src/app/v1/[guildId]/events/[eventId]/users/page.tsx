@@ -1,9 +1,6 @@
 import { api } from '~/trpc/server';
 import { DataTable } from "./data-table";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 export default async function EmployeesPage({ params }: { params: { eventId: string } }) {
   const users = await api.web.userOnEvent.all({ eventId: params.eventId })
 
