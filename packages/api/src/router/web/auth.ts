@@ -243,9 +243,7 @@ export const authRouter = createTRPCRouter({
     ).mutation(async ({ ctx, input }) => {
         const body = input
 
-        console.log(body, "YEAH BUDDY")
-
-        const exists = await ctx.prisma.authChallenge.findUnique({
+        const exists = await ctx.prisma.authChallenge.findFirst({
             where: { id: body.validationId, discharged: true }
         })
 
@@ -270,38 +268,31 @@ export const authRouter = createTRPCRouter({
             });
         }
 
+        await ctx.prisma.authChallenge.update({
+            where: { id: exists.id },
+            data: { discharged: false },
+        })
 
         if (exists.userId) {
-
-            const updateUser = await ctx.prisma.user.update({
+            return ctx.prisma.user.update({
                 where: { id: exists.userId },
                 data: { emailVerified: true },
                 select: { id: true }
             })
+        }
 
-            console.log(updateUser, "updated user email verified")
-
-            return updateUser
-        } else if (exists.guildId) {
-
-            const updateGuild = await ctx.prisma.guild.update({
+        if (exists.guildId) {
+            return ctx.prisma.guild.update({
                 where: { id: exists.guildId },
                 data: { emailVerified: true },
                 select: { id: true }
             })
-
-            console.log(updateGuild, "updated guild email verified")
-
-            return updateGuild
         }
 
-        const discharge = await ctx.prisma.authChallenge.update({
-            where: { id: exists.id },
-            data: { discharged: false },
-            select: { id: true }
+        throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'El challenge no tiene usuario ni guild asociado.',
         })
-
-        return discharge
     }),
 
     restorePassword: publicProcedure.input(
