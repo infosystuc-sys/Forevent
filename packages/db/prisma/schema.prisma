@@ -68,6 +68,8 @@ model User {
   ticketsBuyer     UserTicket[]    @relation("buyer")
   ticketsOwner     UserTicket[]    @relation("owner")
   favoriteEvents   UserFavoriteEvent[]
+  chatReadCursors  ChatReadCursor[]
+  chatParticipants ChatParticipant[]
 }
 
 model AuthChallenge {
@@ -373,23 +375,29 @@ model Relationship {
 }
 
 model Chat {
-  id          String      @id @unique @default(uuid())
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  status      Status      @default(ACCEPTED)
-  discharged  Boolean     @default(true)
-  eventId     String
-  requesterId String
-  receiverId  String
-  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  receiver    UserOnEvent @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  requester   UserOnEvent @relation("requester", fields: [requesterId], references: [id], onDelete: Cascade)
-  messages    Message[]
-  pictures    Picture[]
+  id           String            @id @unique @default(uuid())
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  status       Status            @default(ACCEPTED)
+  type         ChatType          @default(DM)
+  name         String?
+  image        String?
+  discharged   Boolean           @default(true)
+  eventId      String
+  requesterId  String?
+  receiverId   String?
+  event        Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  receiver     UserOnEvent?      @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  requester    UserOnEvent?      @relation("requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  messages     Message[]
+  pictures     Picture[]
+  readCursors  ChatReadCursor[]
+  participants ChatParticipant[]
 
   @@index([requesterId])
   @@index([receiverId])
   @@index([eventId])
+  @@index([eventId, type])
 }
 
 model Purchase {
@@ -602,6 +610,7 @@ model UserOnEvent {
   discharged     Boolean   @default(true)
   userId         String
   eventId        String
+  lastSeenAt     DateTime?
   chatsReceiver  Chat[]    @relation("receiver")
   chatsRequester Chat[]    @relation("requester")
   messages       Message[]
@@ -672,6 +681,37 @@ model Review {
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
+}
+
+model ChatReadCursor {
+  id         String   @id @default(uuid())
+  chatId     String
+  userId     String
+  lastReadAt DateTime @default(now())
+  chat       Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
+}
+
+model ChatParticipant {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  chatId    String
+  userId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
+}
+
+enum ChatType {
+  DM
+  CHANNEL
 }
 
 enum GlobalRole {

@@ -1,7 +1,7 @@
 import { CreatePostSchema } from "@forevent/validators";
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { createTRPCRouter, mobileProtectedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 
 export const userRouter = createTRPCRouter({
@@ -227,6 +227,16 @@ export const userRouter = createTRPCRouter({
         })
         return data
     }),
+
+    heartbeat: mobileProtectedProcedure
+        .input(z.object({ eventId: z.string() }))
+        .mutation(async ({ ctx, input }) => {
+            await ctx.prisma.userOnEvent.updateMany({
+                where: { userId: ctx.user.id, eventId: input.eventId, discharged: true },
+                data: { lastSeenAt: new Date() },
+            });
+            return { success: true };
+        }),
 
     "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {
         return
