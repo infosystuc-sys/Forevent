@@ -4,7 +4,7 @@ import type { RouterOutputs } from "@forevent/api";
 import type { Session } from '@forevent/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -14,13 +14,15 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Icons } from '../ui/icons';
 import { Input } from '../ui/input';
 
-const verifySchema = z.object({ code: z.string().min(1, { message: "Debes completar este campo.", }), validationId: z.string() })
-
+const verifySchema = z.object({
+    code: z.string().min(1, { message: "Debes completar este campo." }),
+})
 
 export default function VerifyForm({ session, isVerified }: { session: Session | null, isVerified: Awaited<Awaited<RouterOutputs["web"]["auth"]["getIsVerified"]>> }) {
     const router = useRouter();
     const utils = api.useUtils()
     const effectRan = useRef(false);
+    const [validationId, setValidationId] = useState<string | null>(null)
 
     const getIsVerified = api.web.auth.getIsVerified.useQuery({
         email: session?.user?.email!,
@@ -35,32 +37,22 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
     })
 
     const confirmEmail = api.web.auth.submitValidation.useMutation({
-        onSuccess: async (res) => {
-            console.log(res, "success");
-
+        onSuccess: async () => {
             toast("Confirmación exitosa", {
                 description: "Confirmaste el correo electronico exitosamente.",
-                action: {
-                    label: "Cerrar",
-                    onClick: () => console.log("cerrar"),
-                },
+                action: { label: "Cerrar", onClick: () => {} },
             })
             await utils.web.guild.getGuilds.invalidate()
             await utils.web.auth.getIsVerified.invalidate()
             router.push("/v1")
         },
         onError: (error) => {
-            console.log(error.data, error.message, error.shape, "error")
             if (error.data?.code === "UNAUTHORIZED") {
                 form.setError("code", { message: error.message })
             } else {
                 toast("Ocurrio un error", {
                     description: error.message,
-                    action: {
-                        label: "Cerrar", onClick: () => {
-                            // console.log("close!")
-                        }
-                    }
+                    action: { label: "Cerrar", onClick: () => {} },
                 })
             }
         }
@@ -68,33 +60,23 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
 
     const createValidation = api.web.auth.createValidation.useMutation({
         onSuccess: (res) => {
-            console.log(res, "success created validation")
-            form.setValue("validationId", res)
+            setValidationId(res)
         },
         onError: (error) => {
-            console.log(error.data, error.message, error.shape, "error")
             if (error.data?.code === "CONFLICT") {
                 router.push("/v1")
-            } else if (error.data?.code === "BAD_REQUEST") {
-                // router.refresh()
             } else {
                 toast("Ocurrio un error", {
                     description: error.message,
-                    action: {
-                        label: "Cerrar", onClick: () => {
-                            // console.log("close!")
-                        }
-                    }
+                    action: { label: "Cerrar", onClick: () => {} },
                 })
             }
         }
     })
 
     async function onSubmitValidation(data: z.infer<typeof verifySchema>) {
-        console.log(JSON.stringify(data), "data submit validation")
-        console.log(createValidation.data, "HAY create validation data")
-        confirmEmail.mutate({ ...data, type: "USER" })
-
+        if (!validationId) return
+        confirmEmail.mutate({ code: data.code, validationId, type: "USER" })
     }
 
     async function onResend() {
@@ -107,11 +89,13 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
             if (getIsVerified.data.emailVerified) {
                 router.push("/v1")
             }
-            console.log("effect applied - only on the FIRST mount");
         }
-
         return () => { effectRan.current = true };
     }, []);
+
+    const isSending = createValidation.isPending
+    const isConfirming = confirmEmail.isPending
+    const isSubmitDisabled = isSending || isConfirming || !validationId
 
     return (
         <div className='flex flex-1 items-center justify-center'>
@@ -145,8 +129,8 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
                             )}
                         />
                         <div className="flex justify-center items-center">
-                            <Button type="submit" className="" form="verify" disabled={confirmEmail.isPending}>
-                                {confirmEmail.isPending ?
+                            <Button type="submit" className="" form="verify" disabled={isSubmitDisabled}>
+                                {(isSending || isConfirming) ?
                                     <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                                     :
                                     "Confirmar"
@@ -157,7 +141,7 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
                 </Form>
                 <div className='flex items-center justify-center'>
                     <p className='text-neutral-400 text-sm'>No te llego el codigo?</p>
-                    <Button variant={"link"} onClick={() => { onResend() }}>
+                    <Button variant={"link"} onClick={onResend} disabled={isSending}>
                         Enviar otro código
                     </Button>
                 </div>
