@@ -4,7 +4,7 @@ import type { RouterOutputs } from "@forevent/api";
 import type { Session } from '@forevent/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -21,8 +21,17 @@ const verifySchema = z.object({
 export default function VerifyForm({ session, isVerified }: { session: Session | null, isVerified: Awaited<Awaited<RouterOutputs["web"]["auth"]["getIsVerified"]>> }) {
     const router = useRouter();
     const utils = api.useUtils()
-    const effectRan = useRef(false);
-    const [validationId, setValidationId] = useState<string | null>(null)
+
+    const email = session?.user?.email ?? ''
+    // Keys survive Fast Refresh (sessionStorage outlives component remount from HMR)
+    const challengeKey = `vf_challenge_${email}`
+    const firedKey = `vf_fired_${email}`
+
+    // Restore validationId from sessionStorage on mount — this survives Fast Refresh resets
+    const [validationId, setValidationId] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return null
+        return sessionStorage.getItem(challengeKey)
+    })
 
     const getIsVerified = api.web.auth.getIsVerified.useQuery({
         email: session?.user?.email!,
@@ -38,6 +47,8 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
 
     const confirmEmail = api.web.auth.submitValidation.useMutation({
         onSuccess: async () => {
+            sessionStorage.removeItem(challengeKey)
+            sessionStorage.removeItem(firedKey)
             toast("Confirmación exitosa", {
                 description: "Confirmaste el correo electronico exitosamente.",
                 action: { label: "Cerrar", onClick: () => {} },
@@ -50,6 +61,9 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
             if (error.data?.code === "UNAUTHORIZED") {
                 form.setError("code", { message: error.message })
             } else {
+                // Challenge expired, already used, or not found — clear it so user can resend
+                sessionStorage.removeItem(challengeKey)
+                setValidationId(null)
                 toast("Ocurrio un error", {
                     description: error.message,
                     action: { label: "Cerrar", onClick: () => {} },
@@ -60,13 +74,14 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
 
     const createValidation = api.web.auth.createValidation.useMutation({
         onSuccess: (res) => {
+            sessionStorage.setItem(challengeKey, res)
             setValidationId(res)
         },
         onError: (error) => {
             if (error.data?.code === "CONFLICT") {
                 router.push("/v1")
             } else {
-                toast("Ocurrio un error", {
+                toast("Ocurrio un error al enviar el código", {
                     description: error.message,
                     action: { label: "Cerrar", onClick: () => {} },
                 })
@@ -80,18 +95,28 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
     }
 
     async function onResend() {
-        createValidation.mutate({ email: session?.user.email! as string, type: "USER" })
+        sessionStorage.removeItem(challengeKey)
+        sessionStorage.removeItem(firedKey)
+        setValidationId(null)
+        createValidation.mutate({ email, type: "USER" })
     }
 
     useEffect(() => {
-        if (!effectRan.current) {
-            createValidation.mutate({ email: session?.user.email! as string, type: "USER" })
-            if (getIsVerified.data.emailVerified) {
-                router.push("/v1")
-            }
+        if (!email) return
+        // sessionStorage flag prevents re-firing after Fast Refresh HMR remounts
+        if (sessionStorage.getItem(firedKey)) return
+        // If we already have a validationId stored, skip re-creating the challenge
+        if (sessionStorage.getItem(challengeKey)) return
+
+        if (getIsVerified.data?.emailVerified) {
+            router.push("/v1")
+            return
         }
-        return () => { effectRan.current = true };
-    }, []);
+
+        sessionStorage.setItem(firedKey, '1')
+        createValidation.mutate({ email, type: "USER" })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     const isSending = createValidation.isPending
     const isConfirming = confirmEmail.isPending
@@ -141,7 +166,7 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
                 </Form>
                 <div className='flex items-center justify-center'>
                     <p className='text-neutral-400 text-sm'>No te llego el codigo?</p>
-                    <Button variant={"link"} onClick={onResend} disabled={isSending}>
+                    <Button variant={"link"} onClick={onResend} disabled={isSending || isConfirming}>
                         Enviar otro código
                     </Button>
                 </div>

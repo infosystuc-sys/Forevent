@@ -68,14 +68,11 @@ export const authRouter = createTRPCRouter({
             type: z.enum(["GUILD", "USER"]),
         })
     ).mutation(async ({ ctx, input }) => {
-        console.log(input, "yeah buddy!!!")
 
         if (input.type === "USER") {
 
             const exists = await ctx.prisma.user.findUnique({
-                where: {
-                    email: input.email
-                }
+                where: { email: input.email }
             })
 
             if (!exists) {
@@ -95,21 +92,12 @@ export const authRouter = createTRPCRouter({
             const token = (Math.floor(Math.random() * 90000) + 10000).toString()
 
             const challenge = await ctx.prisma.authChallenge.create({
-                data: {
-                    code: token,
-                    userId: exists.id
-                },
+                data: { code: token, userId: exists.id },
             })
 
-            if (!challenge) {
-                throw new TRPCError({
-                    code: 'INTERNAL_SERVER_ERROR',
-                    message: 'Error al crear el codigo de verificación.',
-                });
-            }
-
-            console.log("Intentando enviar mail a:", input.email, "| from:", `Forevent <${NOREPLY_EMAIL}>`, "| code:", token)
-
+            // Email sending is best-effort: a failure does NOT abort the flow.
+            // The challenge ID is returned regardless so the client can enable the input.
+            // In dev, check server logs for the code if Resend is restricted.
             const sendEmail = await ctx.resend.emails.send({
                 from: `Forevent <${NOREPLY_EMAIL}>`,
                 to: [input.email],
@@ -117,13 +105,8 @@ export const authRouter = createTRPCRouter({
                 react: ValidationCodeEmailTemplate({ validationCode: token })
             })
 
-            console.log("[createValidation USER] Resultado Resend:", JSON.stringify(sendEmail))
-
             if (sendEmail.error) {
-                throw new TRPCError({
-                    code: 'INTERNAL_SERVER_ERROR',
-                    message: `Error al enviar el código: ${sendEmail.error.message}`,
-                })
+                console.error(`[createValidation USER] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
             }
 
             return challenge.id
@@ -131,9 +114,7 @@ export const authRouter = createTRPCRouter({
         } else {
 
             const exists = await ctx.prisma.guild.findUnique({
-                where: {
-                    email: input.email
-                }
+                where: { email: input.email }
             })
 
             if (!exists) {
@@ -153,20 +134,8 @@ export const authRouter = createTRPCRouter({
             const token = (Math.floor(Math.random() * 90000) + 10000).toString()
 
             const challenge = await ctx.prisma.authChallenge.create({
-                data: {
-                    code: token,
-                    guildId: exists.id
-                },
+                data: { code: token, guildId: exists.id },
             })
-
-            if (!challenge) {
-                throw new TRPCError({
-                    code: 'INTERNAL_SERVER_ERROR',
-                    message: 'Error al crear el codigo de verificación.',
-                });
-            }
-
-            console.log("Intentando enviar mail a:", input.email, "| from:", `Forevent <${NOREPLY_EMAIL}>`, "| code:", token)
 
             const sendEmail = await ctx.resend.emails.send({
                 from: `Forevent <${NOREPLY_EMAIL}>`,
@@ -175,13 +144,8 @@ export const authRouter = createTRPCRouter({
                 react: ValidationCodeEmailTemplate({ validationCode: token })
             })
 
-            console.log("[createValidation GUILD] Resultado Resend:", JSON.stringify(sendEmail))
-
             if (sendEmail.error) {
-                throw new TRPCError({
-                    code: 'INTERNAL_SERVER_ERROR',
-                    message: `Error al enviar el código: ${sendEmail.error.message}`,
-                })
+                console.error(`[createValidation GUILD] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
             }
 
             return challenge.id
