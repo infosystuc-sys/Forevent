@@ -1,10 +1,9 @@
 "use client"
 
-import type { RouterOutputs } from "@forevent/api";
 import type { Session } from '@forevent/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -18,16 +17,10 @@ const verifySchema = z.object({
     code: z.string().min(1, { message: "Debes completar este campo." }),
 })
 
-export default function VerifyForm({ session, isVerified }: { session: Session | null, isVerified: Awaited<Awaited<RouterOutputs["web"]["auth"]["getIsVerified"]>> }) {
+export default function VerifyForm({ session, challengeId }: { session: Session | null, challengeId: string }) {
     const router = useRouter();
     const utils = api.useUtils()
-    const effectRan = useRef(false)
-    const [validationId, setValidationId] = useState<string | null>(null)
-
-    const getIsVerified = api.web.auth.getIsVerified.useQuery({
-        email: session?.user?.email!,
-        type: "USER"
-    }, { initialData: isVerified })
+    const [validationId, setValidationId] = useState(challengeId)
 
     const form = useForm<z.infer<typeof verifySchema>>({
         resolver: zodResolver(verifySchema),
@@ -50,7 +43,6 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
             if (error.data?.code === "UNAUTHORIZED") {
                 form.setError("code", { message: error.message })
             } else {
-                setValidationId(null)
                 toast("Ocurrio un error", {
                     description: error.message,
                     action: { label: "Cerrar", onClick: () => {} },
@@ -62,6 +54,10 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
     const createValidation = api.web.auth.createValidation.useMutation({
         onSuccess: (res) => {
             setValidationId(res)
+            toast("Código enviado", {
+                description: "Revisa tu bandeja de entrada.",
+                action: { label: "Cerrar", onClick: () => {} },
+            })
         },
         onError: (error) => {
             if (error.data?.code === "CONFLICT") {
@@ -75,32 +71,16 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
         }
     })
 
-    async function onSubmitValidation(data: z.infer<typeof verifySchema>) {
-        if (!validationId) return
+    function onSubmitValidation(data: z.infer<typeof verifySchema>) {
         confirmEmail.mutate({ code: data.code, validationId, type: "USER" })
     }
 
-    async function onResend() {
-        setValidationId(null)
+    function onResend() {
         createValidation.mutate({ email: session?.user.email! as string, type: "USER" })
     }
 
-    useEffect(() => {
-        if (effectRan.current) return
-        effectRan.current = true
-
-        if (getIsVerified.data?.emailVerified) {
-            router.push("/v1")
-            return
-        }
-
-        createValidation.mutate({ email: session?.user.email! as string, type: "USER" })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
     const isSending = createValidation.isPending
     const isConfirming = confirmEmail.isPending
-    const isSubmitDisabled = isSending || isConfirming || !validationId
 
     return (
         <div className='flex flex-1 items-center justify-center'>
@@ -134,8 +114,8 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
                             )}
                         />
                         <div className="flex justify-center items-center">
-                            <Button type="submit" className="" form="verify" disabled={isSubmitDisabled}>
-                                {(isSending || isConfirming) ?
+                            <Button type="submit" form="verify" disabled={isConfirming}>
+                                {isConfirming ?
                                     <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                                     :
                                     "Confirmar"
@@ -147,7 +127,11 @@ export default function VerifyForm({ session, isVerified }: { session: Session |
                 <div className='flex items-center justify-center'>
                     <p className='text-neutral-400 text-sm'>No te llego el codigo?</p>
                     <Button variant={"link"} onClick={onResend} disabled={isSending || isConfirming}>
-                        Enviar otro código
+                        {isSending ?
+                            <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                            :
+                            "Enviar otro código"
+                        }
                     </Button>
                 </div>
             </div>

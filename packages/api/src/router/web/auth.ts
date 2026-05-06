@@ -95,25 +95,17 @@ export const authRouter = createTRPCRouter({
                 data: { code: token, userId: exists.id },
             })
 
-            // Best-effort email: try-catch + 10s timeout so the flow never hangs
-            try {
-                const sendEmail = await Promise.race([
-                    ctx.resend.emails.send({
-                        from: `Forevent <${NOREPLY_EMAIL}>`,
-                        to: [input.email],
-                        subject: "Tu código de verificación de Forevent",
-                        react: ValidationCodeEmailTemplate({ validationCode: token })
-                    }),
-                    new Promise<{ error: { message: string } }>((resolve) =>
-                        setTimeout(() => resolve({ error: { message: "timeout 10s" } }), 10_000)
-                    ),
-                ])
-                if (sendEmail.error) {
-                    console.error(`[createValidation USER] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
-                }
-            } catch (err) {
+            // Fire-and-forget: don't await — response returns immediately
+            ctx.resend.emails.send({
+                from: `Forevent <${NOREPLY_EMAIL}>`,
+                to: [input.email],
+                subject: "Tu código de verificación de Forevent",
+                react: ValidationCodeEmailTemplate({ validationCode: token })
+            }).then((r) => {
+                if (r.error) console.error(`[createValidation USER] Resend: ${r.error.message} | to: ${input.email} | code: ${token}`)
+            }).catch((err) => {
                 console.error(`[createValidation USER] Resend exception | to: ${input.email} | code: ${token}`, err)
-            }
+            })
 
             return challenge.id
 
@@ -143,24 +135,16 @@ export const authRouter = createTRPCRouter({
                 data: { code: token, guildId: exists.id },
             })
 
-            try {
-                const sendEmail = await Promise.race([
-                    ctx.resend.emails.send({
-                        from: `Forevent <${NOREPLY_EMAIL}>`,
-                        to: [input.email],
-                        subject: "Tu código de verificación de Forevent",
-                        react: ValidationCodeEmailTemplate({ validationCode: token })
-                    }),
-                    new Promise<{ error: { message: string } }>((resolve) =>
-                        setTimeout(() => resolve({ error: { message: "timeout 10s" } }), 10_000)
-                    ),
-                ])
-                if (sendEmail.error) {
-                    console.error(`[createValidation GUILD] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
-                }
-            } catch (err) {
+            ctx.resend.emails.send({
+                from: `Forevent <${NOREPLY_EMAIL}>`,
+                to: [input.email],
+                subject: "Tu código de verificación de Forevent",
+                react: ValidationCodeEmailTemplate({ validationCode: token })
+            }).then((r) => {
+                if (r.error) console.error(`[createValidation GUILD] Resend: ${r.error.message} | to: ${input.email} | code: ${token}`)
+            }).catch((err) => {
                 console.error(`[createValidation GUILD] Resend exception | to: ${input.email} | code: ${token}`, err)
-            }
+            })
 
             return challenge.id
 

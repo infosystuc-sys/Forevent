@@ -12,13 +12,17 @@ export default async function Page() {
 
     const isVerified = await api.web.auth.getIsVerified({ email, type: "USER" })
 
-    // const validation = await api.web.createValidation.mutate({ email: session?.user?.email!, type: "USER" })
+    if (isVerified.emailVerified) {
+        redirect('/v1')
+    }
+
+    const challengeId = await api.web.auth.createValidation({ email, type: "USER" })
 
     return (
         <div className="flex-1">
             <div className="h-screen flex items-center justify-center">
                 <div className="flex w-full flex-col items-center space-y-6 sm:w-[25rem]">
-                    <VerifyForm session={session} isVerified={isVerified} />
+                    <VerifyForm session={session} challengeId={challengeId} />
                 </div>
             </div>
         </div>
