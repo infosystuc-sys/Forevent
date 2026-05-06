@@ -95,18 +95,24 @@ export const authRouter = createTRPCRouter({
                 data: { code: token, userId: exists.id },
             })
 
-            // Email sending is best-effort: a failure does NOT abort the flow.
-            // The challenge ID is returned regardless so the client can enable the input.
-            // In dev, check server logs for the code if Resend is restricted.
-            const sendEmail = await ctx.resend.emails.send({
-                from: `Forevent <${NOREPLY_EMAIL}>`,
-                to: [input.email],
-                subject: "Tu código de verificación de Forevent",
-                react: ValidationCodeEmailTemplate({ validationCode: token })
-            })
-
-            if (sendEmail.error) {
-                console.error(`[createValidation USER] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
+            // Best-effort email: try-catch + 10s timeout so the flow never hangs
+            try {
+                const sendEmail = await Promise.race([
+                    ctx.resend.emails.send({
+                        from: `Forevent <${NOREPLY_EMAIL}>`,
+                        to: [input.email],
+                        subject: "Tu código de verificación de Forevent",
+                        react: ValidationCodeEmailTemplate({ validationCode: token })
+                    }),
+                    new Promise<{ error: { message: string } }>((resolve) =>
+                        setTimeout(() => resolve({ error: { message: "timeout 10s" } }), 10_000)
+                    ),
+                ])
+                if (sendEmail.error) {
+                    console.error(`[createValidation USER] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
+                }
+            } catch (err) {
+                console.error(`[createValidation USER] Resend exception | to: ${input.email} | code: ${token}`, err)
             }
 
             return challenge.id
@@ -137,15 +143,23 @@ export const authRouter = createTRPCRouter({
                 data: { code: token, guildId: exists.id },
             })
 
-            const sendEmail = await ctx.resend.emails.send({
-                from: `Forevent <${NOREPLY_EMAIL}>`,
-                to: [input.email],
-                subject: "Tu código de verificación de Forevent",
-                react: ValidationCodeEmailTemplate({ validationCode: token })
-            })
-
-            if (sendEmail.error) {
-                console.error(`[createValidation GUILD] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
+            try {
+                const sendEmail = await Promise.race([
+                    ctx.resend.emails.send({
+                        from: `Forevent <${NOREPLY_EMAIL}>`,
+                        to: [input.email],
+                        subject: "Tu código de verificación de Forevent",
+                        react: ValidationCodeEmailTemplate({ validationCode: token })
+                    }),
+                    new Promise<{ error: { message: string } }>((resolve) =>
+                        setTimeout(() => resolve({ error: { message: "timeout 10s" } }), 10_000)
+                    ),
+                ])
+                if (sendEmail.error) {
+                    console.error(`[createValidation GUILD] Resend error: ${sendEmail.error.message} | to: ${input.email} | code: ${token}`)
+                }
+            } catch (err) {
+                console.error(`[createValidation GUILD] Resend exception | to: ${input.email} | code: ${token}`, err)
             }
 
             return challenge.id
