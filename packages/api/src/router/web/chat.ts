@@ -149,10 +149,6 @@ export const chatRouter = createTRPCRouter({
     console.log(exists, "exists!")
 
     if (exists) {
-      ctx.socket.connect()
-      console.log(ctx.socket.active, "ANTES DE DESCONECTAR")
-      ctx.socket.emit('login', { chatId: exists.id, name: exists.requester.user.name });
-      ctx.socket.disconnect()
       throw new TRPCError({
         code: "CONFLICT",
         message: exists.id
@@ -170,12 +166,6 @@ export const chatRouter = createTRPCRouter({
         message: 'No se pudo crear el chat.'
       })
     }
-
-    ctx.socket.connect()
-    console.log(ctx.socket.active, "ANTES DE DESCONECTAR")
-    ctx.socket.emit('login', { chatId: chat.id, name: chat.requester.user.name });
-    ctx.socket.disconnect()
-    console.log(ctx.socket.active, "DESPUES DE DESCONECTAR")
 
     return chat.id
   }),

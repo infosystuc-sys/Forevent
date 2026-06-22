@@ -62,7 +62,6 @@ import { useSession } from '~/context/auth';
 import useTheme from '~/hooks/useTheme';
 import { api } from '~/utils/api';
 import { PLACEHOLDER, blurhash, dayjs } from '~/utils/constants';
-import { socket } from '~/utils/socket';
 
 // ─── Brand palette ──────────────────────────────────────────────────────────────
 const C = {
@@ -609,15 +608,6 @@ export default function Page() {
 
   const firstAvailableTicket = ticketsList.find((t) => !t.isGiftBlocking) ?? null
   const availableCount = ticket.data?.availableCount ?? 0
-
-  useEffect(() => {
-    const socketTicketId = firstAvailableTicket?.url ?? ticketsList[0]?.url ?? userTicketId ?? eventTicketId
-    socket.emit('joinTransaction', { userId: user?.id, userTicketId: socketTicketId })
-    socket.on('response', ({ message, code }: { message: string; code: string }) => {
-      console.log('Socket response:', message, code)
-    })
-    return () => { socket.disconnect() }
-  }, [])
 
   useEffect(() => {
     ticket.refetch()

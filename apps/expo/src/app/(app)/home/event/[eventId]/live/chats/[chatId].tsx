@@ -11,7 +11,7 @@ import { useSession } from '~/context/auth'
 import useTheme from '~/hooks/useTheme'
 import { api } from '~/utils/api'
 import { blurhash, dayjs } from '~/utils/constants'
-import { socket } from '~/utils/socket'
+import { usePusher } from '~/hooks/useSocket'
 
 type WsMessage = {
     id: string
@@ -44,10 +44,35 @@ export default function Page() {
     const [wsMessages, setWsMessages] = useState<WsMessage[]>([])
     const [message, setMessage] = useState("")
 
+    const myRequesterIdRef = useRef('')
     const createMessage = api.mobile.message.create.useMutation({
-        onSuccess: () => {
-            // Message will arrive via WS; also refetch for consistency
-            messagesQuery.refetch()
+        // Optimistic UI: agrega el mensaje localmente antes de la respuesta del servidor
+        onMutate: ({ text }) => {
+            const tempId = `opt-${Date.now()}-${Math.random()}`
+            setWsMessages((prev) => [
+                {
+                    id: tempId,
+                    text,
+                    createdAt: new Date(),
+                    requesterId: 'self',
+                    requester: { user: { id: user?.id ?? '', name: user?.name ?? '', image: user?.image ?? null } },
+                },
+                ...prev,
+            ])
+            return { tempId }
+        },
+        // Reemplaza el mensaje temporal con el real confirmado por el servidor
+        onSuccess: (newMessage, _, context) => {
+            if (newMessage.requesterId) myRequesterIdRef.current = newMessage.requesterId
+            if (!context?.tempId) return
+            setWsMessages((prev) =>
+                prev.map((m) => m.id === context.tempId ? (newMessage as WsMessage) : m)
+            )
+        },
+        // Si falla, elimina el mensaje optimista
+        onError: (_, __, context) => {
+            if (!context?.tempId) return
+            setWsMessages((prev) => prev.filter((m) => m.id !== context.tempId))
         },
     })
 
@@ -57,40 +82,34 @@ export default function Page() {
         setMessage("")
     }, [message, chatId])
 
-    // Socket lifecycle
-    useEffect(() => {
-        socket.connect()
-        socket.emit('login', { requesterId: user?.id, chatId })
+    const { onMessage } = usePusher(chatId)
 
-        socket.on("message", (msg: WsMessage) => {
-            // Only add if not from current user (we already show via mutation)
-            if (msg.requester?.user?.id !== user?.id) {
-                setWsMessages((prev) => [msg, ...prev])
-            }
-        })
+    useEffect(() => {
+        const handler = (msg: WsMessage) => {
+            // Skip own message echoes (already shown via optimistic UI)
+            if (msg.requesterId === myRequesterIdRef.current) return
+            setWsMessages((prev) => [msg, ...prev])
+        }
+        const cleanup = onMessage(handler)
 
         // Mark as read on open
         markRead.mutate({ chatId: chatId! })
 
         // Heartbeat for online status
+        let interval: ReturnType<typeof setInterval> | undefined
         if (eventId) {
             heartbeat.mutate({ eventId })
-            const interval = setInterval(() => heartbeat.mutate({ eventId }), 60_000)
-            return () => {
-                clearInterval(interval)
-                socket.disconnect()
-                markRead.mutate({ chatId: chatId! })
-                utils.mobile.chat.all.invalidate()
-            }
+            interval = setInterval(() => heartbeat.mutate({ eventId }), 60_000)
         }
 
         return () => {
-            socket.disconnect()
+            cleanup()
+            if (interval) clearInterval(interval)
             markRead.mutate({ chatId: chatId! })
             utils.mobile.chat.all.invalidate()
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [chatId, user?.id, onMessage])
 
     if (messagesQuery.isLoading || !messagesQuery.data || getChat.isLoading) {
         return <Loading />
@@ -99,9 +118,10 @@ export default function Page() {
     const chatData = getChat.data
     const isChannel = chatData?.type === 'CHANNEL'
 
-    // Merge WS messages with paginated DB messages
+    // Merge WS messages with paginated DB messages, dedup por text+createdAt
     const dbMessages = messagesQuery.data.pages.flatMap((p) => p.items)
-    const allMessages = [...wsMessages, ...dbMessages]
+    const wsKeys = new Set(wsMessages.map((m) => `${m.text}|${new Date(m.createdAt).getTime()}`))
+    const allMessages = [...wsMessages, ...dbMessages.filter((m) => !wsKeys.has(`${m.text}|${new Date(m.createdAt).getTime()}`))]
 
     // Header info
     const otherUser = isChannel
@@ -161,8 +181,6 @@ export default function Page() {
                                         <Text className='text-gray-500'>
                                             {participantCount} participantes
                                         </Text>
-                                    ) : !isChannel && socket.active ? (
-                                        <Text className='text-gray-500'>En línea</Text>
                                     ) : null}
                                 </View>
                             </View>

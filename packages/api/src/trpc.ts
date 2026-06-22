@@ -14,7 +14,7 @@ import type { Session } from "@forevent/auth";
 import { auth } from "@forevent/auth";
 import prisma from "@forevent/db";
 import { resend } from "./lib/resend";
-import { socket } from "./lib/socket"
+import { pusher } from "./lib/pusher"
 /**
  * 1. CONTEXT
  *
@@ -75,7 +75,7 @@ export const createTRPCContext = async (opts: {
   return {
     session,
     mobileSession,
-    socket,
+    pusher,
     prisma,
     resend,
   };

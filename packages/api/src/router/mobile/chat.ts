@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, mobileProtectedProcedure } from "../../trpc";
+import { assertChatParticipant, CHAT_CHANNEL_PREFIX } from "../../lib/chat-auth";
 
 export const chatRouter = createTRPCRouter({
   /**
@@ -100,16 +101,20 @@ export const chatRouter = createTRPCRouter({
           event: { select: { id: true, name: true, image: true } },
           requester: {
             select: {
+              userId: true,
               user: { select: { id: true, name: true, image: true, email: true } },
             },
           },
           requesterId: true,
           receiver: {
             select: {
+              userId: true,
               user: { select: { id: true, name: true, image: true, email: true } },
             },
           },
           receiverId: true,
+          // Solo para chequear pertenencia del usuario actual sin una segunda query
+          participants: { where: { userId: ctx.user.id }, select: { id: true }, take: 1 },
           _count: { select: { participants: true } },
         },
       });
@@ -118,22 +123,18 @@ export const chatRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "El chat no existe." });
       }
 
-      // Authorization: verify user is a participant
-      const isRequester = chat.requester?.user.id === ctx.user.id;
-      const isReceiver = chat.receiver?.user.id === ctx.user.id;
-      if (chat.type === "DM" && !isRequester && !isReceiver) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "No tenés acceso a este chat." });
-      }
-      if (chat.type === "CHANNEL") {
-        const participant = await ctx.prisma.chatParticipant.findUnique({
-          where: { chatId_userId: { chatId: chat.id, userId: ctx.user.id } },
-        });
-        if (!participant) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "No formas parte de este canal." });
-        }
+      // Chequeo de pertenencia con los datos ya traídos arriba — evita repetir la query
+      // que hacía assertChatParticipant (la misma fila, dos round-trips a la DB).
+      const isParticipant =
+        chat.type === "DM"
+          ? chat.requester?.userId === ctx.user.id || chat.receiver?.userId === ctx.user.id
+          : chat.participants.length > 0;
+      if (!isParticipant) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "No sos participante de este chat." });
       }
 
-      return chat;
+      const { participants: _participants, ...chatWithoutAuthProbe } = chat;
+      return chatWithoutAuthProbe;
     }),
 
   /**
@@ -182,9 +183,6 @@ export const chatRouter = createTRPCRouter({
       });
 
       if (exists) {
-        ctx.socket.connect();
-        ctx.socket.emit("login", { chatId: exists.id, name: requester.id });
-        ctx.socket.disconnect();
         throw new TRPCError({ code: "CONFLICT", message: exists.id });
       }
 
@@ -196,10 +194,6 @@ export const chatRouter = createTRPCRouter({
           eventId: input.eventId,
         },
       });
-
-      ctx.socket.connect();
-      ctx.socket.emit("login", { chatId: chat.id, name: requester.id });
-      ctx.socket.disconnect();
 
       return chat.id;
     }),
@@ -336,5 +330,28 @@ export const chatRouter = createTRPCRouter({
     .input(z.object({ chatId: z.string() }))
     .mutation(() => {
       return;
+    }),
+
+  /**
+   * Autoriza la suscripción del cliente a un canal Pusher privado
+   * (`private-chat-{chatId}`). Solo firma la autorización si el usuario
+   * autenticado es participante de ese chat — sin esto, cualquiera con el
+   * chatId podía escuchar los mensajes en vivo sin haber pasado por ningún
+   * chequeo de pertenencia.
+   */
+  pusherAuth: mobileProtectedProcedure
+    .input(z.object({ socketId: z.string(), channelName: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!input.channelName.startsWith(CHAT_CHANNEL_PREFIX)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Canal inválido." });
+      }
+      const chatId = input.channelName.slice(CHAT_CHANNEL_PREFIX.length);
+      if (!chatId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Canal inválido." });
+      }
+
+      await assertChatParticipant(ctx.prisma, ctx.user.id, chatId);
+
+      return ctx.pusher.authorizeChannel(input.socketId, input.channelName);
     }),
 });

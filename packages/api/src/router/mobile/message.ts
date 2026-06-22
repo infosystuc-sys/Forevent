@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, mobileProtectedProcedure } from "../../trpc";
+import { assertChatParticipant, chatChannelName } from "../../lib/chat-auth";
 
 export const messageRouter = createTRPCRouter({
   /**
@@ -15,36 +16,7 @@ export const messageRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      // Verify the user has access to this chat
-      const chat = await ctx.prisma.chat.findUnique({
-        where: { id: input.chatId },
-        select: {
-          type: true,
-          eventId: true,
-          requester: { select: { userId: true } },
-          receiver: { select: { userId: true } },
-        },
-      });
-
-      if (!chat) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Chat no encontrado." });
-      }
-
-      if (chat.type === "DM") {
-        const isParticipant =
-          chat.requester?.userId === ctx.user.id ||
-          chat.receiver?.userId === ctx.user.id;
-        if (!isParticipant) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "No tenés acceso a este chat." });
-        }
-      } else {
-        const participant = await ctx.prisma.chatParticipant.findUnique({
-          where: { chatId_userId: { chatId: input.chatId, userId: ctx.user.id } },
-        });
-        if (!participant) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "No formas parte de este canal." });
-        }
-      }
+      await assertChatParticipant(ctx.prisma, ctx.user.id, input.chatId);
 
       const messages = await ctx.prisma.message.findMany({
         where: { chatId: input.chatId },
@@ -87,36 +59,7 @@ export const messageRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { text, chatId } = input;
 
-      const chat = await ctx.prisma.chat.findUnique({
-        where: { id: chatId },
-        select: {
-          type: true,
-          eventId: true,
-          requester: { select: { userId: true } },
-          receiver: { select: { userId: true } },
-        },
-      });
-
-      if (!chat) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Chat no encontrado." });
-      }
-
-      // Authorization check
-      if (chat.type === "DM") {
-        const isParticipant =
-          chat.requester?.userId === ctx.user.id ||
-          chat.receiver?.userId === ctx.user.id;
-        if (!isParticipant) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "No sos participante de este chat." });
-        }
-      } else {
-        const participant = await ctx.prisma.chatParticipant.findUnique({
-          where: { chatId_userId: { chatId, userId: ctx.user.id } },
-        });
-        if (!participant) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "No formas parte de este canal." });
-        }
-      }
+      const chat = await assertChatParticipant(ctx.prisma, ctx.user.id, chatId);
 
       // Resolve the correct UserOnEvent.id for the FK
       const userOnEvent = await ctx.prisma.userOnEvent.findFirst({
@@ -130,38 +73,37 @@ export const messageRouter = createTRPCRouter({
         });
       }
 
-      const newMessage = await ctx.prisma.message.create({
-        data: { text, requesterId: userOnEvent.id, chatId },
-        select: {
-          id: true,
-          text: true,
-          createdAt: true,
-          requesterId: true,
-          requester: {
-            select: {
-              user: { select: { id: true, name: true, image: true } },
+      // Parallelizar escritura del mensaje y actualización del chat (era secuencial)
+      const [newMessage] = await Promise.all([
+        ctx.prisma.message.create({
+          data: { text, requesterId: userOnEvent.id, chatId },
+          select: {
+            id: true,
+            text: true,
+            createdAt: true,
+            requesterId: true,
+            requester: {
+              select: {
+                user: { select: { id: true, name: true, image: true } },
+              },
             },
           },
-        },
-      });
+        }),
+        ctx.prisma.chat.update({
+          where: { id: chatId },
+          data: { updatedAt: new Date() },
+        }),
+      ]);
 
-      // Update chat.updatedAt so it sorts to top of chat list
-      await ctx.prisma.chat.update({
-        where: { id: chatId },
-        data: { updatedAt: new Date() },
-      });
-
-      // Emit via WebSocket for real-time delivery
-      ctx.socket.connect();
-      ctx.socket.emit("sendMessage", {
+      // Emit vía WebSocket — canal privado, requiere autorización (ver chat.pusherAuth)
+      await ctx.pusher.trigger(chatChannelName(chatId), "new-message", {
+        id: newMessage.id,
         chatId,
         requesterId: userOnEvent.id,
         text,
-        id: newMessage.id,
         createdAt: newMessage.createdAt,
         requester: newMessage.requester,
       });
-      ctx.socket.disconnect();
 
       return newMessage;
     }),
