@@ -63,6 +63,7 @@ export const eventRouter = createTRPCRouter({
       distinct: ['userId'],
       select: {
         id: true,
+        lastSeenAt: true,
         user: { select: { id: true, image: true, name: true } }
       }
     })
@@ -619,14 +620,6 @@ export const eventRouter = createTRPCRouter({
         status: 'ACCEPTED'
       }
     })
-
-    ctx.socket.connect()
-    ctx.socket.emit('response', {
-      message: 'Entraste al evento',
-      code: 'SUCCESS'
-    });
-
-    ctx.socket.disconnect()
 
     return update
   }),

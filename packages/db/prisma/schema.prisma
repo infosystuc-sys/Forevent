@@ -457,6 +457,7 @@ model Message {
 
   @@index([chatId])
   @@index([requesterId])
+  @@index([chatId, createdAt(sort: Desc)])
 }
 
 model Claim {

@@ -20,7 +20,7 @@ export default function Page() {
 
     const chats = api.mobile.chat.all.useQuery(
         { eventId: eventId! as string },
-        { refetchInterval: 15_000 }
+        { refetchInterval: 8_000 }
     )
 
     // Auto-join event channel (creates if needed)

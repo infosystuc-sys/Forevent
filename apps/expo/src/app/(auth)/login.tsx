@@ -10,12 +10,21 @@ import { ActivityIndicator, Alert, Animated, Keyboard, Platform, Pressable, Text
 import { CodeField, Cursor, useBlurOnFulfill, useClearByFocusCell } from 'react-native-confirmation-code-field';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
-import { GoogleSignin, statusCodes } from "@react-native-google-signin/google-signin";
 import Logo from '~/assets/logo';
 import TextInput from '~/components/input';
 import { useSession } from "~/context/auth";
 import useTheme from "~/hooks/useTheme";
 import { api } from "~/utils/api";
+
+let GoogleSignin: any = null;
+let statusCodes: any = {};
+try {
+  const mod = require("@react-native-google-signin/google-signin");
+  GoogleSignin = mod.GoogleSignin;
+  statusCodes = mod.statusCodes;
+} catch {
+  // native module unavailable — Google login button will show an error
+}
 
 const CELL_SIZE = 70;
 const CELL_BORDER_RADIUS = 100;
@@ -138,6 +147,10 @@ const Page: React.FC = () => {
     const [googleLoading, setGoogleLoading] = useState(false)
 
     async function handleGoogleSignIn() {
+        if (!GoogleSignin) {
+            Alert.alert("Google Sign-In no disponible", "El módulo nativo no está instalado en este build.")
+            return
+        }
         if (googleLoading || signInWithGoogle.isPending) return
         setGoogleLoading(true)
         try {
