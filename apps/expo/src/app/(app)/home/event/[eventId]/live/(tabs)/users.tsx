@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import { FlashList } from '@shopify/flash-list'
 import { Image } from 'expo-image'
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   KeyboardAvoidingView,
@@ -115,6 +115,16 @@ function EventChat({ eventId }: { eventId: string }) {
       enabled: !!chatId,
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     }
+  )
+
+  // El tab "users" persiste montado en el Tabs navigator (no se desmonta al
+  // cambiar de tab), así que sin esto el chat del canal queda congelado en el
+  // primer fetch para siempre — refetch al recuperar foco, no solo al montar.
+  useFocusEffect(
+    useCallback(() => {
+      if (!chatId) return
+      void messagesQuery.refetch()
+    }, [chatId]),
   )
 
   const markRead = api.mobile.chat.markRead.useMutation()
