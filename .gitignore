@@ -59,5 +59,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# 🏗️ Build logs locales (gradle / EAS)
+build-release.log
+release-build.log
+
 # ☁️ Vercel
 .vercel
