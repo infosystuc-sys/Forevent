@@ -16,7 +16,10 @@ export default function Page() {
     const { colors } = useTheme()
     const insets = useSafeAreaInsets();
     const utils = api.useUtils()
-    const invites = api.mobile.joinInvite.byUserId.useQuery({ userId: user!.id })
+    const invites = api.mobile.joinInvite.byUserId.useQuery(
+        { userId: user?.id ?? '' },
+        { enabled: !!user?.id },
+    )
 
     const joinInvite = api.mobile.joinInvite.modify.useMutation({
         onSuccess: (res) => {

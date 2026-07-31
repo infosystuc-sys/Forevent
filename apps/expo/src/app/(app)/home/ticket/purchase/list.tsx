@@ -54,9 +54,11 @@ export default function PurchaseListPage() {
   const units = purchaseIds.map((id, i) => {
     const data = queries[i]?.data
     const hasGift = (data?.gifts?.length ?? 0) > 0
+    const name = data?.productOnDeposit?.product?.name ?? data?.deal?.name ?? 'Producto'
     return {
       id,
       index: i,
+      name,
       status: (data?.status as string) ?? 'PENDING',
       isGifted: hasGift,
       giftReceiverName: hasGift ? data?.gifts?.[0]?.giftReceiver?.name ?? null : null,
@@ -107,7 +109,7 @@ export default function PurchaseListPage() {
               </View>
 
               <View style={styles.cardInfo}>
-                <Text style={styles.cardTitle}>Unidad {item.index + 1}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.cardId}>#{item.id.slice(-8).toUpperCase()}</Text>
                 {item.isGifted && (
                   <View style={styles.giftLabel}>

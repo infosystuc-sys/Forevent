@@ -19,3 +19,7 @@ try {
 
 // Patch obligatorio: palabras reservadas de Hermes para React Native
 execSync('node patches/fix-hermes-reserved-words.js', { stdio: 'inherit', cwd: ROOT })
+
+// Patch obligatorio: switch no exhaustivo de Calendar.Identifier en expo-localization
+// (necesario para compilar contra el SDK de iOS 26 / Xcode 26)
+execSync('node patches/fix-expo-localization-calendar-switch.js', { stdio: 'inherit', cwd: ROOT })

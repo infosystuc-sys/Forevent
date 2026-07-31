@@ -16,7 +16,10 @@ export default function profile() {
     const insets = useSafeAreaInsets();
     const router = useRouter()
 
-    const profile = api.mobile.user.profile.useQuery({ id: user!.id })
+    const profile = api.mobile.user.profile.useQuery(
+        { id: user?.id ?? '' },
+        { enabled: !!user?.id },
+    )
 
     return (
         <View style={{ flex: 1, flexDirection: 'column', paddingTop: insets.top, paddingHorizontal: 15 }}>

@@ -84,7 +84,10 @@ export default function PurchaseDetailPage() {
     { userPurchaseId: userPurchaseId! },
     { enabled: !!userPurchaseId },
   )
-  const friends = api.mobile.user.friend.useQuery({ userId: user!.id })
+  const friends = api.mobile.user.friend.useQuery(
+    { userId: user?.id ?? '' },
+    { enabled: !!user?.id },
+  )
 
   // ── Gift mutation ────────────────────────────────────────────────────────────
   const giftMutation = api.mobile.invite.giftCreate.useMutation({
@@ -169,7 +172,7 @@ export default function PurchaseDetailPage() {
   const giftReceiver = purchase.gifts?.[0]?.giftReceiver ?? null
   const canGift = !isDelivered && !hasPendingGift && purchase.ownerId === user?.id
 
-  const qrValue = JSON.stringify({ s: user?.id, p: [purchase.id] })
+  const qrValue = JSON.stringify({ s: user?.id, p: [purchase.id], sig: purchase.sig })
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>

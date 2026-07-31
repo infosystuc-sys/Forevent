@@ -30,9 +30,15 @@ const Page: React.FC = () => {
     const { control, handleSubmit, reset } = useForm();
     const router = useRouter()
 
-    const invitesCount = api.mobile.invite.giftCount.useQuery({ eventId, userId: user!.id })
+    const invitesCount = api.mobile.invite.giftCount.useQuery(
+        { eventId, userId: user?.id ?? '' },
+        { enabled: !!user?.id },
+    )
 
-    const purchases = api.mobile.userPurchase.all.useQuery({ eventId, userId: user!.id })
+    const purchases = api.mobile.userPurchase.all.useQuery(
+        { eventId, userId: user?.id ?? '' },
+        { enabled: !!user?.id },
+    )
 
     const users = api.mobile.userOnEvent.all.useQuery({ eventId })
 

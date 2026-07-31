@@ -5,13 +5,19 @@ import type { ExpoConfig } from "expo/config";
 const repoRoot = path.resolve(__dirname, "../..");
 require("@expo/env").load(repoRoot, { force: true });
 
+// EAS CLI resuelve este config (para cualquier comando, no solo build) con
+// EXPO_NO_DOTENV seteado, lo que bloquea la carga del .env de arriba. En ese caso
+// no hay forma de validar las keys localmente — el build real en la nube las toma
+// de las Environment Variables configuradas en el proyecto de EAS, no de acá.
+const IS_EAS_CLI_CONFIG_RESOLUTION = !!process.env.EXPO_NO_DOTENV;
+
 // Google Maps key para Android. Validamos que exista en el entorno pero NO la
 // inyectamos directo en el config: pasamos el placeholder `${GOOGLE_MAPS_API_KEY}`
 // literal para que prebuild lo escriba tal cual en AndroidManifest.xml, y gradle
 // lo sustituya desde EXPO_PUBLIC_GOOGLE_MAPS_API_KEY vía manifestPlaceholders.
 // Así la key real nunca queda hardcodeada en archivos trackeados por git.
 const HAS_ANDROID_GOOGLE_MAPS_API_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
-if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY) {
+if (!HAS_ANDROID_GOOGLE_MAPS_API_KEY && !IS_EAS_CLI_CONFIG_RESOLUTION) {
   throw new Error(
     "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY es obligatoria. Definila en .env (raíz del monorepo).",
   );
@@ -22,7 +28,7 @@ const ANDROID_GOOGLE_MAPS_API_KEY_PLACEHOLDER = "${GOOGLE_MAPS_API_KEY}";
 // directamente en AppDelegate.swift por el plugin with-maps.js en tiempo de prebuild.
 // La carpeta ios/ está en .gitignore, por lo que la key nunca queda en el repo.
 const IOS_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_KEY?.trim() ?? "";
-if (!IOS_GOOGLE_MAPS_API_KEY) {
+if (!IOS_GOOGLE_MAPS_API_KEY && !IS_EAS_CLI_CONFIG_RESOLUTION) {
   throw new Error(
     "[app.config] EXPO_PUBLIC_GOOGLE_MAPS_IOS_KEY es obligatoria. Definila en .env (raíz del monorepo).",
   );
@@ -47,7 +53,7 @@ const defineConfig = (): ExpoConfig => ({
   },
   assetBundlePatterns: ["**/*"],
   ios: {
-    bundleIdentifier: "com.ssitgroup.forevent",
+    bundleIdentifier: "com.foreventapp.ios",
     supportsTablet: false,
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
@@ -55,6 +61,9 @@ const defineConfig = (): ExpoConfig => ({
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: false,
       },
+      // La app solo usa HTTPS estándar (ningún cifrado propietario), así que
+      // califica para la exención de export compliance de Apple.
+      ITSAppUsesNonExemptEncryption: false,
     },
     config: {
       googleMapsApiKey: IOS_GOOGLE_MAPS_API_KEY,
@@ -133,7 +142,11 @@ const defineConfig = (): ExpoConfig => ({
         // URL scheme para iOS (formato com.googleusercontent.apps.<ID>).
         // El plugin escribe el CFBundleURLSchemes en Info.plist al hacer prebuild.
         // En Android no hace falta config extra (autolinking).
-        iosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_OAUTH_IOS_URL_SCHEME,
+        // Fallback: el plugin de google-signin tira un error fatal si esto queda
+        // undefined, y durante la resolución local de EAS CLI (IS_EAS_CLI_CONFIG_RESOLUTION)
+        // el .env está bloqueado. El build real en la nube sí recibe el valor correcto
+        // desde las Environment Variables del proyecto en EAS.
+        iosUrlScheme: process.env.EXPO_PUBLIC_GOOGLE_OAUTH_IOS_URL_SCHEME || "com.googleusercontent.apps.placeholder",
       },
     ],
     "./expo-plugins/with-gesture-handler.js",

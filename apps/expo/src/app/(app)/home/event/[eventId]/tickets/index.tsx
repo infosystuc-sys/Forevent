@@ -237,8 +237,7 @@ export default function Index() {
                         if (!event.data?.tickets.some((ticket) => ticket.quantity - ticket._count.userTicket > 0)) {
                             Alert.alert('Agotado', 'No hay tickets disponibles')
                         } else {
-                            console.log(user, "USER")
-                            buy.mutate({ userId: user!.id, tickets: getPurchase() })
+                            buy.mutate({ tickets: getPurchase() })
                         }
 
                     }}

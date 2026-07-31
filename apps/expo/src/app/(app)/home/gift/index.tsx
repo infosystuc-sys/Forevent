@@ -19,7 +19,10 @@ const Gift: React.FC = () => {
     const { user } = useSession()
     const utils = api.useUtils()
 
-    const invites = api.mobile.user.gifts.useQuery({ userId: user!.id })
+    const invites = api.mobile.user.gifts.useQuery(
+        { userId: user?.id ?? '' },
+        { enabled: !!user?.id },
+    )
 
     if (invites.isSuccess) {
         console.log(JSON.stringify(invites.data), "invites")

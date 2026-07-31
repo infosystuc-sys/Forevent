@@ -173,18 +173,28 @@ export default function ProductsScreen() {
     // ── Purchase mutation ────────────────────────────────────────────────────
     const utils = api.useUtils()
     const purchaseMutation = api.mobile.purchase.products.useMutation({
-        onSuccess: async () => {
+        onSuccess: async (result) => {
             setCart({})
             // Refetch explícito (await) en lugar de invalidate. Garantiza que la lista
-            // de "Mis compras" tenga el dato nuevo antes de mostrar el alert al user.
+            // de "Mis compras" tenga el dato nuevo antes de navegar al QR.
             // Sin esto, en MIUI/Xiaomi el invalidate disparaba un refetch que el OS
             // bloqueaba silenciosamente y el user no veía la compra recién hecha.
             await utils.mobile.userPurchase.myPurchases.refetch()
-            Alert.alert(
-                '¡Pedido confirmado!',
-                'Tu pedido fue registrado exitosamente. Presentá el QR en el mostrador.',
-                [{ text: 'Entendido' }],
-            )
+
+            const ids = result.userPurchaseIds
+            // Misma lógica que en el módulo de "Mis compras" (home/(tabs)/ticket.tsx):
+            // una sola unidad → directo al QR; varias → lista de unidades del pedido.
+            if (ids.length === 1) {
+                router.push({
+                    pathname: '/(app)/home/ticket/purchase/[userPurchaseId]/',
+                    params: { userPurchaseId: ids[0]! },
+                })
+            } else if (ids.length > 1) {
+                router.push({
+                    pathname: '/(app)/home/ticket/purchase/list',
+                    params: { ids: JSON.stringify(ids), productName: 'Tu pedido' },
+                })
+            }
         },
         onError: (err) => {
             Alert.alert('Error en el pedido', err.message)
@@ -236,7 +246,6 @@ export default function ProductsScreen() {
                                 quantity: e.quantity,
                                 product: { id: e.id, type: e.type },
                             })),
-                            userId:  user!.id,
                             eventId: eventId!,
                         })
                     },

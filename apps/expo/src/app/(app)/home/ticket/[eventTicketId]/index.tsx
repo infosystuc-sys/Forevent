@@ -521,7 +521,6 @@ export default function Page() {
                 quantity: e.quantity,
                 product: { id: e.id, type: e.type },
               })),
-              userId: user!.id,
               eventId,
             })
           },
@@ -537,12 +536,18 @@ export default function Page() {
     mode: 'onBlur',
   })
 
-  const ticket = api.mobile.userTicket.byEventTicket.useQuery({
-    eventTicketId,
-    userId: user!.id,
-    ...(userTicketId && { userTicketId }),
-  })
-  const friends = api.mobile.user.friend.useQuery({ userId: user!.id })
+  const ticket = api.mobile.userTicket.byEventTicket.useQuery(
+    {
+      eventTicketId,
+      userId: user?.id ?? '',
+      ...(userTicketId && { userTicketId }),
+    },
+    { enabled: !!user?.id },
+  )
+  const friends = api.mobile.user.friend.useQuery(
+    { userId: user?.id ?? '' },
+    { enabled: !!user?.id },
+  )
 
   const eventId = ticket.data?.eventTicket?.event.id
 
@@ -597,6 +602,7 @@ export default function Page() {
   const ticketsList = (ticket.data?.tickets ?? []) as Array<{
     userTicketId: string
     url: string
+    sig: string
     isGift: boolean
     giftStatus: string | null
     giftId: string | null
@@ -800,7 +806,7 @@ export default function Page() {
               </View>
 
               {ticketsList.map((t, i) => {
-                const qrValue = JSON.stringify({ url: t.url, u: user?.id })
+                const qrValue = JSON.stringify({ url: t.url, u: user?.id, sig: t.sig })
                 const isBlocked = t.isGiftBlocking
                 const statusColor = isBlocked ? '#f59e0b' : '#22c55e'
                 const statusLabel = isBlocked ? 'En regalo' : 'Activa'

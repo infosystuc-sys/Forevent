@@ -44,7 +44,6 @@ export default function Page() {
     const [wsMessages, setWsMessages] = useState<WsMessage[]>([])
     const [message, setMessage] = useState("")
 
-    const myRequesterIdRef = useRef('')
     const createMessage = api.mobile.message.create.useMutation({
         // Optimistic UI: agrega el mensaje localmente antes de la respuesta del servidor
         onMutate: ({ text }) => {
@@ -63,7 +62,6 @@ export default function Page() {
         },
         // Reemplaza el mensaje temporal con el real confirmado por el servidor
         onSuccess: (newMessage, _, context) => {
-            if (newMessage.requesterId) myRequesterIdRef.current = newMessage.requesterId
             if (!context?.tempId) return
             setWsMessages((prev) =>
                 prev.map((m) => m.id === context.tempId ? (newMessage as WsMessage) : m)
@@ -86,8 +84,10 @@ export default function Page() {
 
     useEffect(() => {
         const handler = (msg: WsMessage) => {
-            // Skip own message echoes (already shown via optimistic UI)
-            if (msg.requesterId === myRequesterIdRef.current) return
+            // Skip own message echoes (already shown via optimistic UI). Compara contra
+            // user?.id (conocido de inmediato) en vez de esperar la respuesta de la mutation
+            // — evita el duplicado cuando el push de Pusher llega antes que el HTTP response.
+            if (msg.requester?.user?.id === user?.id) return
             setWsMessages((prev) => [msg, ...prev])
         }
         const cleanup = onMessage(handler)

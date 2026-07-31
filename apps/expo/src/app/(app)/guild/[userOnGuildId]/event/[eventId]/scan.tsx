@@ -138,7 +138,7 @@ export default function ScanScreen() {
       try {
         const parseData = JSON.parse(scanResult.data);
 
-        // QR de PRODUCTO: { s: userId, p: [purchaseId, ...] }
+        // QR de PRODUCTO: { s: userId, p: [purchaseId, ...], sig }
         if (parseData.s && parseData.p) {
           const userId = parseData.s;
           const productIds = Array.isArray(parseData.p)
@@ -146,34 +146,36 @@ export default function ScanScreen() {
             : [parseData.p];
           if (
             typeof userId !== 'string' ||
+            typeof parseData.sig !== 'string' ||
             productIds.some((id: unknown) => typeof id !== 'string')
           ) {
             showResult('error', 'QR inválido');
             return;
           }
           scanProducts.mutate({
-            userOnGuildId: userOnGuildId!,
             eventId: eventId!,
             userId,
             userProductsIds: productIds,
+            sig: parseData.sig,
           });
           return;
         }
 
-        // QR de ENTRADA: { url: userTicketId, u: userId }
+        // QR de ENTRADA: { url: userTicketId, u: userId, sig }
         if (parseData.url && parseData.u) {
           if (
             typeof parseData.url !== 'string' ||
-            typeof parseData.u !== 'string'
+            typeof parseData.u !== 'string' ||
+            typeof parseData.sig !== 'string'
           ) {
             showResult('error', 'QR inválido');
             return;
           }
           scanTicket.mutate({
-            userOnGuildId: userOnGuildId!,
             eventId: eventId!,
             userId: parseData.u,
             userTicketId: parseData.url,
+            sig: parseData.sig,
           });
           return;
         }

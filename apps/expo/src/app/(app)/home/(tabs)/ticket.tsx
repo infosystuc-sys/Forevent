@@ -265,8 +265,9 @@ export default function Page() {
 
   const utils = api.useUtils()
   const ticketsQuery = api.mobile.userTicket.list.useQuery(
-    { userId: user!.id },
+    { userId: user?.id ?? '' },
     {
+      enabled: !!user?.id,
       staleTime: 0,
       // Siempre re-fetcha al montar (cubre cambios de cuenta y aceptaciones recientes)
       refetchOnMount: 'always',

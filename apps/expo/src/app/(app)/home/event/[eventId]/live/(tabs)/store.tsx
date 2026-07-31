@@ -411,10 +411,8 @@ export default function Page() {
                           quantity: item.quantity,
                         }
                       }),
-                      userId: user!.id,
                       eventId,
                     })
-                    console.log(JSON.stringify({ products: cartForm.watch('cart'), userId: user!.id }), "PURCHASE")
                   }}>
                     {purchase.isPending ?
                       <ActivityIndicator style={{ paddingHorizontal: 20, paddingVertical: 12.5, }} />
