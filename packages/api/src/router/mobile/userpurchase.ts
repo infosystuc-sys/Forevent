@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, mobileProtectedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
+import { productQrMessage, signQrMessage } from "../../lib/qrSignature";
 
 export const userPurchaseRouter = createTRPCRouter({
   all: publicProcedure.input(z.object({ userId: z.string(), eventId: z.string() })).query(async ({ ctx, input }) => {
@@ -284,7 +285,10 @@ export const userPurchaseRouter = createTRPCRouter({
       })
     }
 
-    return purchase
+    return {
+      ...purchase,
+      sig: signQrMessage(productQrMessage(purchase.ownerId, [purchase.id])),
+    }
   }),
 
   qrInfo: publicProcedure.input(z.object({ userPurchaseId: z.string() })).query(async ({ ctx, input }) => {
@@ -338,25 +342,10 @@ export const userPurchaseRouter = createTRPCRouter({
     return purchase
   }),
 
-  ScanQr: publicProcedure.input(z.object({ userPurchaseId: z.string(), employeeId: z.string(), counterId: z.string().optional() })).mutation(async ({ ctx, input }) => {
-    const { employeeId, userPurchaseId, counterId } = input
-
-    const employee = await ctx.prisma.userOnGuild.findFirst({
-      where: {
-        id: employeeId,
-        role: 'EMPLOYEE',
-        status: 'ACCEPTED',
-        discharged: true,
-      },
-      select: { id: true },
-    });
-
-    if (!employee) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Empleado no autorizado',
-      });
-    }
+  // employeeId/counterId se derivan del scanner autenticado (ctx.user) y de su
+  // employeeOnEvent activo, nunca del input — el cliente sólo manda el QR escaneado.
+  ScanQr: mobileProtectedProcedure.input(z.object({ userPurchaseId: z.string() })).mutation(async ({ ctx, input }) => {
+    const { userPurchaseId } = input
 
     const purchase = await ctx.prisma.userPurchase.findUnique({
       where: {
@@ -364,14 +353,23 @@ export const userPurchaseRouter = createTRPCRouter({
       },
       select: {
         discharged: true,
+        status: true,
         productOnDeposit: {
           select: {
             product: {
               select: {
                 name: true,
                 image: true,
+                event: { select: { id: true } },
               }
             }
+          }
+        },
+        deal: {
+          select: {
+            name: true,
+            image: true,
+            event: { select: { id: true } },
           }
         },
         owner: {
@@ -380,7 +378,6 @@ export const userPurchaseRouter = createTRPCRouter({
             image: true,
           }
         },
-        status: true,
       }
     })
 
@@ -388,6 +385,35 @@ export const userPurchaseRouter = createTRPCRouter({
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'QR inválido'
+      })
+    }
+
+    const eventId = purchase.productOnDeposit?.product?.event?.id ?? purchase.deal?.event?.id
+    if (!eventId) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'QR inválido'
+      })
+    }
+
+    const employeeOnEvent = await ctx.prisma.employeeOnEvent.findFirst({
+      where: {
+        eventId,
+        discharged: true,
+        counterId: { not: null },
+        userOnGuild: {
+          userId: ctx.user.id,
+          role: 'EMPLOYEE',
+          status: 'ACCEPTED',
+          discharged: true,
+        },
+      }
+    })
+
+    if (!employeeOnEvent?.counterId) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Usted no puede scanear productos',
       })
     }
 
@@ -403,16 +429,27 @@ export const userPurchaseRouter = createTRPCRouter({
           message: 'QR rechazado'
         })
     }
-    return await ctx.prisma.userPurchase.update({
+
+    const update = await ctx.prisma.userPurchase.updateMany({
       where: {
-        id: userPurchaseId
+        id: userPurchaseId,
+        status: 'PENDING',
       },
       data: {
         status: 'ACCEPTED',
-        cashierId: employeeId,
-        counterId: counterId,
+        cashierId: employeeOnEvent.userOnGuildId,
+        counterId: employeeOnEvent.counterId,
       }
     })
+
+    if (update.count === 0) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Este QR ya fue utilizado'
+      })
+    }
+
+    return update
   }),
 
   create: protectedProcedure.input(z.object({

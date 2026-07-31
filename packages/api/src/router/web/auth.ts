@@ -264,15 +264,11 @@ export const authRouter = createTRPCRouter({
     ).mutation(async ({ ctx, input }) => {
         const body = input
 
-        console.log(body, 'YEAH BUDDY')
-
         const exists = await ctx.prisma.user.findUnique({
             where: {
                 email: body.email,
             }
         })
-
-        console.log(exists, "exists")
 
         if (!exists) {
             throw new TRPCError({
@@ -310,27 +306,16 @@ export const authRouter = createTRPCRouter({
 
     changePassword: protectedProcedure.input(
         z.object({
-            email: z.string().email().toLowerCase(),
             password: z.string(),
         })
     ).mutation(async ({ ctx, input }) => {
         const body = input
-        const exists = await ctx.prisma.user.findUnique({
-            where: {
-                email: body.email
-            }
-        })
-
-        if (!exists) {
-            throw new TRPCError({
-                code: 'NOT_FOUND',
-                message: 'El usuario ingresado no existe.',
-            });
-        }
+        // El usuario se deriva de la sesión, nunca del input — si no, cualquier
+        // usuario logueado podría cambiar la contraseña de otra cuenta mandando su email.
         const hashedPassword = await bcrypt.hash(body.password, 12);
 
         const updateUser = await ctx.prisma.user.update({
-            where: { id: exists.id },
+            where: { id: ctx.session.user.id },
             data: {
                 password: hashedPassword,
                 passwordVerified: true,
@@ -350,8 +335,6 @@ export const authRouter = createTRPCRouter({
         })
     ).mutation(async ({ ctx, input }) => {
         const body = input
-
-        console.log(body, 'YEAH BUDDY')
 
         const exists = await ctx.prisma.authChallenge.findUnique({
             where: {

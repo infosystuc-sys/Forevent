@@ -1,8 +1,10 @@
 import { CreatePostSchema } from "@forevent/validators";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { createTRPCRouter, mobileProtectedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
+import { expandDealsIntoProducts, sumChargeableTotal, type CartLine } from "../../lib/cartPricing";
 
 export const purchaseRouter = createTRPCRouter({
   all: publicProcedure.input(z.object({
@@ -151,7 +153,7 @@ export const purchaseRouter = createTRPCRouter({
     return
   }),
 
-  products: publicProcedure.input(z.object({
+  products: mobileProtectedProcedure.input(z.object({
     products: z.array(z.object({
       quantity: z.number(),
       product: z.object({
@@ -159,39 +161,22 @@ export const purchaseRouter = createTRPCRouter({
         type: z.enum(['DEAL', 'PRODUCT']),
       })
     })),
-    userId: z.string(),
     eventId: z.string()
   })).mutation(async ({ ctx, input }) => {
-    const { products, userId, eventId } = input
+    const { products, eventId } = input
+    const userId = ctx.user.id
 
-    let prods: {
-      productId: string,
-      quantity: number
-    }[] = []
-    let deals: {
-      dealId: string,
-      quantity: number
-    }[] = []
+    const cart: CartLine[] = products.map(prod => ({
+      productId: prod.product.id,
+      quantity: prod.quantity,
+      type: prod.product.type,
+    }))
 
-    let total = 0
-
-    products.map(prod => {
-      if (prod.product.type === 'PRODUCT') {
-        prods.push({
-          productId: prod.product.id,
-          quantity: prod.quantity
-        })
-      } else {
-        deals.push({
-          dealId: prod.product.id,
-          quantity: prod.quantity
-        })
-      }
-    })
+    const dealIds = cart.filter(line => line.type === 'DEAL').map(line => line.productId)
 
     const dbDeals = await ctx.prisma.deal.findMany({
       where: {
-        id: { "in": deals.map(deal => deal.dealId) }
+        id: { "in": dealIds }
       },
       select: {
         id: true,
@@ -200,27 +185,7 @@ export const purchaseRouter = createTRPCRouter({
       }
     })
 
-    dbDeals.map((dbDeal) => {
-      const deal = deals.find(deal => deal.dealId === dbDeal.id)!
-      total += dbDeal.price * deal.quantity
-      dbDeal.productOnDeal.map((prodOnDeal) => {
-        // uso some xq una vez salte true se corta el map
-        const existProd = prods.some((prod, index) => {
-          if (prod.productId === prodOnDeal.productId) {
-            prods[index]!.quantity += prodOnDeal.quantity * deal.quantity
-            return true
-          }
-          return false
-        })
-
-        if (!existProd) {
-          prods.push({
-            productId: prodOnDeal.productId,
-            quantity: prodOnDeal.quantity * deal.quantity
-          })
-        }
-      })
-    })
+    const { prods, chargeableQuantities, dealsTotal } = expandDealsIntoProducts(cart, dbDeals)
 
     const updateData: {
       prodOnDepositId: string,
@@ -246,19 +211,20 @@ export const purchaseRouter = createTRPCRouter({
       }
     })
 
-    // Add individual product prices to total
-    for (const prod of prods) {
-      const matchingDep = prodOnDeposit.find(d => d.productId === prod.productId)
-      if (matchingDep?.product.price) {
-        // Only add if this product wasn't already part of a deal
-        const isDealProduct = dbDeals.some(d => d.productOnDeal.some(p => p.productId === prod.productId))
-        if (!isDealProduct) {
-          total += matchingDep.product.price * prod.quantity
-        }
+    const productPrices: Record<string, number> = {}
+    for (const dep of prodOnDeposit) {
+      if (dep.product.price != null) {
+        productPrices[dep.productId] = dep.product.price
       }
     }
 
+    // Total = precio de los deals + precio individual de lo que NO vino cubierto por un deal
+    // (antes se salteaba el cobro completo de un producto si aparecía en algún deal comprado,
+    // aunque parte de su cantidad hubiera sido pedida suelta — ver cartPricing.test.ts)
+    let total = dealsTotal + sumChargeableTotal(chargeableQuantities, productPrices)
+
     let data: {
+      id: string,
       buyerId: string,
       ownerId: string,
       status: 'PENDING',
@@ -272,6 +238,7 @@ export const purchaseRouter = createTRPCRouter({
           if (prodOnDep.quantity >= prod.quantity) {
             for (let index = 0; index < prod.quantity; index++) {
               data.push({
+                id: randomUUID(),
                 buyerId: userId,
                 ownerId: userId,
                 status: 'PENDING',
@@ -297,6 +264,7 @@ export const purchaseRouter = createTRPCRouter({
             let loop = quantity < prodOnDep.quantity ? quantity : prodOnDep.quantity
             for (let index = 0; index < loop; index++) {
               data.push({
+                id: randomUUID(),
                 buyerId: userId,
                 ownerId: userId,
                 status: 'PENDING',
@@ -321,7 +289,7 @@ export const purchaseRouter = createTRPCRouter({
 
     const transaction = await ctx.prisma.$transaction(async (trans) => {
 
-      const create = await trans.userPurchase.createMany({
+      await trans.userPurchase.createMany({
         data
       })
 
@@ -342,6 +310,11 @@ export const purchaseRouter = createTRPCRouter({
           })
         )
       );
+
+      return {
+        purchaseId: purchase.id,
+        userPurchaseIds: data.map((d) => d.id),
+      }
     })
 
     return transaction

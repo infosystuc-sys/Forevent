@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
 import { dayjs } from "../../lib/utils";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { productQrMessage, ticketQrMessage, verifyQrSignature } from "../../lib/qrSignature";
+import { createTRPCRouter, mobileProtectedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
 
 const highlightedSelect = {
   id: true,
@@ -560,18 +561,36 @@ export const eventRouter = createTRPCRouter({
     })
   }),
 
-  scanTicket: publicProcedure.input(z.object({
+  scanTicket: mobileProtectedProcedure.input(z.object({
     eventId: z.string(),
-    userOnGuildId: z.string(),
     userTicketId: z.string(),
-    userId: z.string()
+    userId: z.string(),
+    sig: z.string()
   })).mutation(async ({ ctx, input }) => {
-    const { userOnGuildId, eventId, userId, userTicketId } = input
+    const { eventId, userId, userTicketId, sig } = input
+
+    // El QR trae una firma HMAC generada server-side al momento de crear el código;
+    // si no coincide, el QR fue fotografiado/editado/reconstruido a mano y no es de fiar.
+    if (!verifyQrSignature(ticketQrMessage(userTicketId, userId), sig)) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'QR inválido o manipulado'
+      })
+    }
+
+    // El employeeOnEvent se deriva de la sesión del scanner (ctx.user), nunca del input,
+    // para que no se pueda suplantar a otro empleado pasando su userOnGuildId.
     const employeeOnEvent = await ctx.prisma.employeeOnEvent.findFirst({
       where: {
-        userOnGuildId,
         eventId,
         discharged: true,
+        gateId: { not: null },
+        userOnGuild: {
+          userId: ctx.user.id,
+          role: 'EMPLOYEE',
+          status: 'ACCEPTED',
+          discharged: true,
+        },
       }
     })
     if (!employeeOnEvent?.gateId) {
@@ -612,31 +631,57 @@ export const eventRouter = createTRPCRouter({
         message: 'Entrada no válida'
       })
     }
-    const update = await ctx.prisma.userTicket.update({
+
+    // updateMany condicionado por status: si dos scans llegan a la vez, sólo uno
+    // afecta una fila (count === 1); el otro ve count === 0 y sabe que perdió la carrera.
+    const update = await ctx.prisma.userTicket.updateMany({
       where: {
-        id: userTicketId
+        id: userTicketId,
+        status: 'PENDING',
       },
       data: {
-        status: 'ACCEPTED'
+        status: 'ACCEPTED',
+        gateId: employeeOnEvent.gateId,
+        doorkeeperId: employeeOnEvent.userOnGuildId,
       }
     })
+
+    if (update.count === 0) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'La entrada ya fue utilizada'
+      })
+    }
 
     return update
   }),
 
-  scanProducts: publicProcedure.input(z.object({
+  scanProducts: mobileProtectedProcedure.input(z.object({
     userProductsIds: z.array(z.string()),
-    userOnGuildId: z.string(),
     eventId: z.string(),
-    userId: z.string()
+    userId: z.string(),
+    sig: z.string()
   })).mutation(async ({ ctx, input }) => {
-    const { userOnGuildId, eventId, userId, userProductsIds } = input
+    const { eventId, userId, userProductsIds, sig } = input
+
+    if (!verifyQrSignature(productQrMessage(userId, userProductsIds), sig)) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'QR inválido o manipulado'
+      })
+    }
 
     const employeeOnEvent = await ctx.prisma.employeeOnEvent.findFirst({
       where: {
-        userOnGuildId,
         eventId,
         discharged: true,
+        counterId: { not: null },
+        userOnGuild: {
+          userId: ctx.user.id,
+          role: 'EMPLOYEE',
+          status: 'ACCEPTED',
+          discharged: true,
+        },
       }
     })
     if (!employeeOnEvent?.counterId) {
@@ -673,15 +718,25 @@ export const eventRouter = createTRPCRouter({
       }
     })
 
-    return await ctx.prisma.userPurchase.updateMany({
+    const update = await ctx.prisma.userPurchase.updateMany({
       where: {
-        id: { "in": userProductsIds }
+        id: { "in": userProductsIds },
+        status: 'PENDING',
       },
       data: {
         status: 'ACCEPTED',
-        cashierId: userOnGuildId
+        cashierId: employeeOnEvent.userOnGuildId
       }
     })
+
+    if (update.count !== userProductsIds.length) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Algunos productos ya fueron reclamados'
+      })
+    }
+
+    return update
   }),
 
   create: protectedProcedure.input(z.object({

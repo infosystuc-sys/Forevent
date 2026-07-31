@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { dayjs } from "../../lib/utils";
+import { signQrMessage, ticketQrMessage } from "../../lib/qrSignature";
 
 export const userTicketRouter = createTRPCRouter({
   /**
@@ -356,6 +357,7 @@ export const userTicketRouter = createTRPCRouter({
       return {
         userTicketId: t.id,
         url: t.id,
+        sig: signQrMessage(ticketQrMessage(t.id, userId)),
         isGift,
         giftStatus,
         giftId: g?.id ?? null,

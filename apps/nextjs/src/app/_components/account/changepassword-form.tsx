@@ -81,8 +81,7 @@ export function ChangePasswordForm({ session }: { session: Session | null }) {
     })
 
     async function onSubmit(data: z.infer<typeof FormSchema>) {
-        console.log(JSON.stringify(data))
-        newpass.mutate({ email: session?.user.email! as string, password: data.password })
+        newpass.mutate({ password: data.password })
     }
 
     return (

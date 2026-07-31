@@ -267,12 +267,47 @@ export const purchaseRouter = createTRPCRouter({
       dealId: z.string().optional(),
       productId: z.string().optional(),
       quantity: z.number(),
-      price: z.number()
     })),
     eventId: z.string()
-  })).mutation(({ ctx, input }) => {
+  })).mutation(async ({ ctx, input }) => {
+    // El total se recalcula siempre desde el precio en DB — nunca se confía en
+    // un "price" mandado por el cliente, para evitar que se manipule el cobro.
+    const productIds = input.items.filter(item => item.productId).map(item => item.productId!)
+    const dealIds = input.items.filter(item => item.dealId).map(item => item.dealId!)
 
-    const total = input.items.reduce((acumulator, currentValue) => acumulator + currentValue.quantity * currentValue.price, 0)
+    const [products, deals] = await Promise.all([
+      ctx.prisma.product.findMany({
+        where: { id: { "in": productIds } },
+        select: { id: true, price: true },
+      }),
+      ctx.prisma.deal.findMany({
+        where: { id: { "in": dealIds } },
+        select: { id: true, price: true },
+      }),
+    ])
+
+    let total = 0
+    for (const item of input.items) {
+      if (item.productId) {
+        const product = products.find(p => p.id === item.productId)
+        if (!product) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `El producto "${item.name}" no existe`
+          })
+        }
+        total += product.price * item.quantity
+      } else if (item.dealId) {
+        const deal = deals.find(d => d.id === item.dealId)
+        if (!deal) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `La promo "${item.name}" no existe`
+          })
+        }
+        total += deal.price * item.quantity
+      }
+    }
 
     return ctx.prisma.purchase.create({
       data: {

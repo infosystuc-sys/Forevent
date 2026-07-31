@@ -7,6 +7,12 @@ import { Resend } from "resend";
 import { NOREPLY_EMAIL, dayjs } from "../../lib/utils";
 import { verifyGoogleIdToken } from "@forevent/auth";
 import ValidationCodeEmailTemplate from "@forevent/ui/validationcodeemail";
+import {
+  computeAttemptState,
+  generateRandomPassword,
+  isAccountLocked,
+  resetAttemptState,
+} from "../../lib/loginSecurity";
 
 const BCRYPT_ROUNDS = 12;
 const DEFAULT_IMAGE = "https://d1uydgebs34vim.cloudfront.net/static/default.jpg";
@@ -201,8 +207,10 @@ export const authRouter = createTRPCRouter({
     const LOCALE = "es-AR"
     const ZONE_INFO = "America/Argentina/Buenos_Aires"
     const DEFAULT_IMAGE = "https://d1uydgebs34vim.cloudfront.net/static/default.jpg"
-    const DEFAULT_PASSWORD = "Hola1234!"
-    const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, BCRYPT_ROUNDS);
+    // Password aleatoria: estas cuentas inician sesión por email+código (login),
+    // nunca por contraseña — si el usuario quiere loginWithPassword debe pasar
+    // primero por requestPasswordReset. Antes acá había un valor fijo conocido.
+    const hashedPassword = await bcrypt.hash(generateRandomPassword(), BCRYPT_ROUNDS);
 
     const user = await ctx.prisma.user.create(
       {
@@ -272,15 +280,12 @@ export const authRouter = createTRPCRouter({
       console.error("AUTH DEBUG: Resend lanzó excepción →", resendException);
       // Devolvemos el challengeId igual — el código quedó en DB aunque el email
       // falle, lo que permite al usuario reenviar sin crear desafíos duplicados.
-      // En desarrollo el email puede fallar pero el OTP está en los logs del server.
-      console.warn(`AUTH DEBUG: OTP (solo dev) = ${token}`)
       return challenge.id
     }
 
     if (emailError) {
       console.error("AUTH DEBUG: Resend error →", emailError.message);
       // Mismo criterio: devolvemos el challengeId para no bloquear al usuario.
-      console.warn(`AUTH DEBUG: OTP (solo dev) = ${token}`)
       return challenge.id
     }
 
@@ -404,20 +409,36 @@ export const authRouter = createTRPCRouter({
         locale: true,
         zoneinfo: true,
         password: true,
+        loginAttempts: true,
+        lockUntil: true,
       },
     });
 
-    // Misma respuesta para email inexistente o contraseña incorrecta (evita enumeración de usuarios)
+    // Misma respuesta para email inexistente, contraseña incorrecta o cuenta
+    // bloqueada (evita enumeración de usuarios y no revela el estado de lockout)
     const INVALID_MSG = "Email o contraseña incorrectos.";
 
     if (!user) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: INVALID_MSG });
     }
 
-    const passwordMatch = await bcrypt.compare(input.password, user.password);
-    if (!passwordMatch) {
+    if (isAccountLocked(user.lockUntil)) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: INVALID_MSG });
     }
+
+    const passwordMatch = await bcrypt.compare(input.password, user.password);
+    if (!passwordMatch) {
+      await ctx.prisma.user.update({
+        where: { id: user.id },
+        data: computeAttemptState(user.loginAttempts ?? 0),
+      });
+      throw new TRPCError({ code: "UNAUTHORIZED", message: INVALID_MSG });
+    }
+
+    await ctx.prisma.user.update({
+      where: { id: user.id },
+      data: resetAttemptState(),
+    });
 
     const session = await ctx.prisma.session.create({
       data: {
@@ -426,7 +447,7 @@ export const authRouter = createTRPCRouter({
       },
     });
 
-    const { password: _omit, ...safeUser } = user;
+    const { password: _omit, loginAttempts: _a, lockUntil: _l, ...safeUser } = user;
     return { user: safeUser, sessionId: session.id };
   }),
 

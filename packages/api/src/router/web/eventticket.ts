@@ -1,7 +1,7 @@
 import { CreatePostSchema } from "@forevent/validators";
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { createTRPCRouter, mobileProtectedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { dayjs } from "../../lib/utils";
 
@@ -21,15 +21,14 @@ export const eventTicketRouter = createTRPCRouter({
     })
   }),
 
-  purchase: publicProcedure.input(z.object({
-    userId: z.string(),
+  purchase: mobileProtectedProcedure.input(z.object({
     tickets: z.object({
       quantity: z.number(),
       ticketId: z.string()
     }).array()
   })).mutation(async ({ ctx, input }) => {
-    const { tickets, userId } = input
-    console.log("purchase")
+    const { tickets } = input
+    const userId = ctx.user.id
 
     const eventTickets = await ctx.prisma.eventTicket.findMany({
       where: {
@@ -40,53 +39,32 @@ export const eventTicketRouter = createTRPCRouter({
           select: {
             userTicket: true
           }
-        },
-        event: {
-          select: {
-            guild: {
-              select: {
-                mp_token: true
-              }
-            }
-          }
         }
       }
     })
 
-    if (!eventTickets) {
+    if (!eventTickets.length) {
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'No encontramos los tickets'
       })
     }
 
-    eventTickets.map((eventTicket, index) => {
-      console.log(tickets, "tickets!!!!")
+    // El total se calcula siempre desde el precio en DB (eventTicket.price), nunca
+    // se confía en un monto mandado por el cliente — evita que se "regale" una entrada.
+    let total = 0
+    eventTickets.map((eventTicket) => {
       let ticketData = tickets?.find((ticket) => ticket.ticketId === eventTicket.id)
-      console.log(ticketData, "ticket", eventTicket.name, "nombre", !!tickets?.find((ticket) => ticket.ticketId === eventTicket.id))
       if (ticketData && ticketData.quantity > 0 && (eventTicket.quantity - eventTicket._count.userTicket < ticketData.quantity)) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: `Quedan ${eventTicket.quantity - eventTicket._count.userTicket} entrada(s) ${eventTicket.name}`
         })
       }
-    })
-
-    const user = await ctx.prisma.user.findUnique({
-      where: {
-        id: userId
-      },
-      select: {
-        id: true
+      if (ticketData) {
+        total += eventTicket.price * ticketData.quantity
       }
     })
-
-    if (!user) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: 'Ocurrió un error'
-      })
-    }
 
     let data: {
       buyerId: string,
@@ -95,43 +73,41 @@ export const eventTicketRouter = createTRPCRouter({
       status: 'PENDING' | 'ACCEPTED',
     }[] = []
 
-    tickets.map((ticket, index) => {
+    tickets.map((ticket) => {
       for (let i = 0; i < ticket.quantity; i++) {
         data.push({
-          buyerId: user.id,
-          ownerId: user.id,
+          buyerId: userId,
+          ownerId: userId,
           ticketId: ticket.ticketId,
           status: 'PENDING' // ACCEPTED es para cuando el ticket es usado
         })
       }
     })
 
-    // const price = eventTicket.price * quantity
-    // const FEE = price * .04; // Calculo el costo de comision del 4% del precio del producto
-    // const preferenceResponse = await ctx.createPayment(price, FEE)
-    // await ctx.prisma.$transaction(async (transaction) => {
-    //   await transaction.purchase.create({
-    //     data: {
-    //       buyerId: user.id,
-    //       items: {
-    //         create: {
-    //           quantity,
-    //           ticketId,
-    //         }
-    //       },
-    //       price,
-    //       eventId: eventTicket.eventId,
-    //       mp_preferenceId: preferenceResponse.response.id
-    //     }
-    //   })
-    //   await transaction.userTicket.createMany({
-    //     data
-    //   })
-    // })
-    // return preferenceResponse.response
+    // Mercado Pago todavía no está integrado (en pausa hasta tener credenciales de
+    // test), así que por ahora no se cobra de verdad — pero queda un Purchase con el
+    // total real en DB para trazabilidad, en vez de crear UserTicket sin ningún registro.
+    return await ctx.prisma.$transaction(async (trans) => {
+      await trans.purchase.create({
+        data: {
+          buyerId: userId,
+          eventId: eventTickets[0]!.eventId,
+          total,
+          status: 'PENDING',
+          items: {
+            createMany: {
+              data: tickets.map(ticket => ({
+                quantity: ticket.quantity,
+                eventTicketId: ticket.ticketId,
+              }))
+            }
+          }
+        }
+      })
 
-    return await ctx.prisma.userTicket.createMany({
-      data
+      return trans.userTicket.createMany({
+        data
+      })
     })
   }),
 });

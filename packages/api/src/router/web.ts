@@ -1,6 +1,5 @@
 import { artistRouter } from "./web/artist";
 import { authRouter } from "./web/auth";
-import { chatRouter } from "./web/chat";
 import { claimRouter } from "./web/claim";
 import { counterRouter } from "./web/counter";
 import { dealRouter } from "./web/deal";
@@ -13,7 +12,6 @@ import { internalRouter } from "./web/internal";
 import { inviteRouter } from "./web/invite";
 import { itemOnPurchaseRouter } from "./web/itemonpurchase";
 import { joinInviteRouter } from "./web/joininvite";
-import { messageRouter } from "./web/message";
 import { pictureRouter } from "./web/picture";
 import { postRouter } from "./web/post";
 import { productRouter } from "./web/product";
@@ -34,7 +32,6 @@ import { eventTicketRouter } from "./web/eventticket";
 export const webRouter = createTRPCRouter({
     artist: artistRouter,
     cashier: cashierRouter,
-    chat: chatRouter,
     claim: claimRouter,
     counter: counterRouter,
     deal: dealRouter,
@@ -47,7 +44,6 @@ export const webRouter = createTRPCRouter({
     invite: inviteRouter,
     itemOnPurchase: itemOnPurchaseRouter,
     joinInvite: joinInviteRouter,
-    message: messageRouter,
     picture: pictureRouter,
     post: postRouter,
     product: productRouter,
