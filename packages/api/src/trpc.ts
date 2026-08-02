@@ -147,6 +147,39 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 });
 
 /**
+ * Internal (Forevent staff) procedure
+ *
+ * Exige una sesión cuyo email pertenezca a un `InternalUser` activo. La
+ * autorización se resuelve por email, no por método de login: sirve tanto la
+ * sesión de Google como la de usuario y contraseña del panel interno.
+ */
+export const internalProcedure = t.procedure.use(async ({ ctx, next }) => {
+  const email = ctx.session?.user?.email;
+  if (!email) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const staff = await ctx.prisma.internalUser.findFirst({
+    where: { email: email.toLowerCase(), discharged: true },
+    select: { id: true, email: true, name: true },
+  });
+
+  if (!staff) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Esta sección es exclusiva del equipo de Forevent.",
+    });
+  }
+
+  return next({
+    ctx: {
+      session: { ...ctx.session, user: ctx.session!.user },
+      staff,
+    },
+  });
+});
+
+/**
  * Mobile procedure
  *
  * Requiere un `Authorization: Bearer <sessionId>` válido (resuelto en createTRPCContext).

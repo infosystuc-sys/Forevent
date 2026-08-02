@@ -280,7 +280,9 @@ export default function PurchaseDetailPage() {
           <View style={styles.actionsSection}>
             {canGift && (
               <Pressable
-                style={({ pressed }) => [styles.giftBtn, pressed && { opacity: 0.8 }]}
+                // NativeWind v4 descarta la forma de función de `style` (nativewind#1105).
+                style={styles.giftBtn}
+                android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
                 onPress={handleExpandPress}
               >
                 <MaterialCommunityIcons name="gift-outline" size={18} color={C.magenta} />

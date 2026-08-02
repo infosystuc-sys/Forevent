@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="fc2c40d3-7dd8-4a04-80be-61d032aa78fd" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/apps/expo/src/hooks/useSocket.ts" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/packages/api/src/lib/chat-auth.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/ForeventKonTechDev2025nicoonline.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/markdown.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/android/app/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/android/app/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/android/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/android/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/metro.transformer.js" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/metro.transformer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/event/[eventId]/live/(tabs)/chats.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/event/[eventId]/live/(tabs)/chats.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/event/[eventId]/live/(tabs)/users.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/event/[eventId]/live/(tabs)/users.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/event/[eventId]/live/chats/[chatId].tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/event/[eventId]/live/chats/[chatId].tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/ticket/[eventTicketId]/index.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/src/app/(app)/home/ticket/[eventTicketId]/index.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/src/app/(auth)/login.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/src/app/(auth)/login.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/src/app/_layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/src/app/_layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/expo/src/utils/socket.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/expo/src/utils/socket.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/src/lib/socket.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/src/lib/pusher.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/src/router/mobile/chat.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/src/router/mobile/chat.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/src/router/mobile/event.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/src/router/mobile/event.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/src/router/mobile/message.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/src/router/mobile/message.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/src/router/web/chat.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/src/router/web/chat.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/src/router/web/message.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/src/router/web/message.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/api/src/trpc.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/api/src/trpc.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/db/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/packages/db/prisma/schema.prisma" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 2
+}</component>
+  <component name="ProjectId" id="3BaC0DqotJb7AgSKLlEfAg2bIrH" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;fix/fase-1-seguridad&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/FOREVENT2026/ForeventKonTechDev2025nicoonline&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;templates.modelproviders.configurable&quot;
+  }
+}</component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="fc2c40d3-7dd8-4a04-80be-61d032aa78fd" name="Changes" comment="" />
+      <created>1774717568227</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1774717568227</updated>
+    </task>
+    <servers />
+  </component>
+</project>

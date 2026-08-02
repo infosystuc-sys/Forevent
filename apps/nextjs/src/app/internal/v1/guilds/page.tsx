@@ -1,4 +1,5 @@
 import { api } from '~/trpc/server'
+import CreateGuildDialog from './create-guild-dialog'
 import { DataTable } from './data-table'
 
 export default async function Page() {
@@ -12,6 +13,7 @@ export default async function Page() {
             Organizaciones que utilizan la plataforma
           </p>
         </div>
+        <CreateGuildDialog />
       </div>
       <DataTable data={data} />
     </div>

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ph-intelligence-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "D:/NewCall/ph-intelligence", "run", "dev"],
+      "port": 3010
+    },
+    {
+      "name": "forevent-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@forevent/nextjs", "dev"],
+      "port": 3000
+    }
+  ]
+}

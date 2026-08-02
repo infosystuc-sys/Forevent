@@ -1,11 +1,10 @@
-import { auth } from "@forevent/auth"
-import { CreateGuildForm } from "~/app/_components/admin/guild/create"
+import { redirect } from "next/navigation"
 
-export default async function CreateGuild() {
-    const session = await auth()
-    return (
-        <div className="flex-1">
-            <CreateGuildForm session={session}/>
-        </div>
-    )
+/**
+ * El alta de organizaciones pasó a ser exclusiva del equipo Forevent
+ * (/internal/v1/guilds). La ruta se conserva como redirección para no
+ * romper enlaces guardados.
+ */
+export default function CreateGuild() {
+    redirect("/v1/welcome")
 }

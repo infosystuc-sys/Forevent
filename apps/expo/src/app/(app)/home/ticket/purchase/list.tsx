@@ -88,11 +88,13 @@ export default function PurchaseListPage() {
           const isDelivered = item.status === 'ACCEPTED'
           return (
             <Pressable
-              style={({ pressed }) => [
+              // NativeWind v4 descarta la forma de función de `style`
+              // (nativewind#1105) — la tarjeta perdia todos sus estilos.
+              style={[
                 styles.card,
                 item.isGifted && styles.cardGifted,
-                pressed && { opacity: 0.85 },
               ]}
+              android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
               onPress={() =>
                 router.push({
                   pathname: '/(app)/home/ticket/purchase/[userPurchaseId]/',

@@ -21,6 +21,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons'
 import Constants from 'expo-constants'
 import { Image } from 'expo-image'
+import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import React, { useEffect, useRef, useState } from 'react'
@@ -63,6 +64,9 @@ const C = {
     dim:        'rgba(255,255,255,0.50)',
     inputBg:    'rgba(255,255,255,0.07)',
     activePill: '#7c3aed',    // purple activo de la pill
+    purple:     '#8b5cf6',
+    danger:     '#ff5470',
+    dangerBg:   'rgba(255,84,112,0.12)',
 }
 
 // ─── Category pills ─────────────────────────────────────────────────────────────
@@ -372,12 +376,20 @@ export default function Page() {
                     {/* ── User header ── */}
                     <View style={styles.drawerUserHeader}>
                         <View style={styles.drawerAvatarWrap}>
-                            <Image
-                                source={{ uri: user?.image ?? PLACEHOLDER }}
-                                placeholder={blurhash}
-                                contentFit="cover"
-                                style={styles.drawerAvatar}
-                            />
+                            <View style={styles.drawerAvatarGlow} />
+                            <LinearGradient
+                                colors={[C.magenta, C.purple]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.drawerAvatarRing}
+                            >
+                                <Image
+                                    source={{ uri: user?.image ?? PLACEHOLDER }}
+                                    placeholder={blurhash}
+                                    contentFit="cover"
+                                    style={styles.drawerAvatar}
+                                />
+                            </LinearGradient>
                         </View>
                         <Text style={styles.drawerUserName} numberOfLines={1}>
                             {user?.name ?? 'Invitado'}
@@ -388,93 +400,106 @@ export default function Page() {
                             </Text>
                         )}
                         <View style={styles.drawerRolePill}>
-                            <MaterialCommunityIcons
-                                name={activeRole === 'EMPLOYEE' ? 'badge-account-outline' : 'account-circle-outline'}
-                                size={12}
-                                color={C.magenta}
-                            />
+                            <View style={styles.drawerRolePillDot} />
                             <Text style={styles.drawerRolePillText}>
-                                {activeRole === 'EMPLOYEE' ? 'Modo Empleado' : 'Modo Usuario'}
+                                {activeRole === 'EMPLOYEE' ? 'Modo empleado' : 'Modo usuario'}
                             </Text>
                         </View>
                     </View>
 
-                    <View style={styles.drawerDivider} />
-
                     {/* ── Scrollable items ── */}
                     <ScrollView
+                        style={styles.drawerScroll}
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ paddingVertical: 6 }}
+                        contentContainerStyle={styles.drawerScrollContent}
                     >
-                        <DrawerItem
-                            icon="account-outline"
-                            label="Mi perfil"
-                            onPress={() => navigateAndClose(() => router.push('/(app)/home/(tabs)/profile'))}
-                        />
-                        <DrawerItem
-                            icon="ticket-confirmation-outline"
-                            label="Mis entradas"
-                            onPress={() => navigateAndClose(() => router.push('/(app)/home/(tabs)/ticket'))}
-                        />
-                        <DrawerItem
-                            icon="gift-outline"
-                            label="Regalos recibidos"
-                            onPress={() => navigateAndClose(() => router.push('/(app)/home/gift'))}
-                        />
-                        <DrawerItem
-                            icon="map-outline"
-                            label="Explorar mapa"
-                            onPress={() => navigateAndClose(() => router.push('/(app)/home/(tabs)/explore'))}
-                        />
+                        <Text style={styles.drawerGroupLabel}>Cuenta</Text>
+                        <View style={styles.drawerGroup}>
+                            <DrawerItem
+                                icon="account-outline"
+                                label="Mi perfil"
+                                tint="magenta"
+                                onPress={() => navigateAndClose(() => router.push('/(app)/home/(tabs)/profile'))}
+                            />
+                            <DrawerItem
+                                icon="ticket-confirmation-outline"
+                                label="Mis entradas"
+                                tint="magenta"
+                                onPress={() => navigateAndClose(() => router.push('/(app)/home/(tabs)/ticket'))}
+                            />
+                            <DrawerItem
+                                icon="gift-outline"
+                                label="Regalos recibidos"
+                                tint="magenta"
+                                onPress={() => navigateAndClose(() => router.push('/(app)/home/gift'))}
+                            />
+                            <DrawerItem
+                                icon="map-outline"
+                                label="Explorar mapa"
+                                tint="magenta"
+                                last
+                                onPress={() => navigateAndClose(() => router.push('/(app)/home/(tabs)/explore'))}
+                            />
+                        </View>
 
-                        <View style={styles.drawerSubDivider} />
+                        <Text style={styles.drawerGroupLabel}>Organización</Text>
+                        <View style={styles.drawerGroup}>
+                            <DrawerItem
+                                icon="briefcase-outline"
+                                label="Mis organizaciones"
+                                tint="purple"
+                                onPress={() => navigateAndClose(() => router.push('/(app)/settings/guilds'))}
+                            />
+                            <DrawerItem
+                                icon="swap-horizontal"
+                                label={activeRole === 'EMPLOYEE' ? 'Cambiar a modo Usuario' : 'Cambiar a modo Empleado'}
+                                tint="purple"
+                                last
+                                onPress={() => navigateAndClose(() => router.push('/(app)/role-selection'))}
+                            />
+                        </View>
 
-                        <DrawerItem
-                            icon="briefcase-outline"
-                            label="Mis organizaciones"
-                            onPress={() => navigateAndClose(() => router.push('/(app)/settings/guilds'))}
-                        />
-                        <DrawerItem
-                            icon="swap-horizontal"
-                            label={activeRole === 'EMPLOYEE' ? 'Cambiar a modo Usuario' : 'Cambiar a modo Empleado'}
-                            onPress={() => navigateAndClose(() => router.push('/(app)/role-selection'))}
-                        />
-                        <DrawerItem
-                            icon="cog-outline"
-                            label="Ajustes"
-                            onPress={() => navigateAndClose(() => router.push('/(app)/settings'))}
-                        />
+                        <Text style={styles.drawerGroupLabel}>General</Text>
+                        <View style={styles.drawerGroup}>
+                            <DrawerItem
+                                icon="cog-outline"
+                                label="Ajustes"
+                                tint="neutral"
+                                onPress={() => navigateAndClose(() => router.push('/(app)/settings'))}
+                            />
+                            <DrawerItem
+                                icon="help-circle-outline"
+                                label="Ayuda y soporte"
+                                tint="neutral"
+                                onPress={() =>
+                                    Linking.openURL('mailto:soporte@forevent.com.ar?subject=Soporte%20Forevent%20App')
+                                        .catch(() => Alert.alert('Soporte', 'Escribinos a soporte@forevent.com.ar'))
+                                }
+                            />
+                            <DrawerItem
+                                icon="information-outline"
+                                label="Acerca de Forevent"
+                                tint="neutral"
+                                last
+                                onPress={() =>
+                                    Alert.alert(
+                                        'Forevent',
+                                        `Versión ${appVersion}\n\n© ${new Date().getFullYear()} Forevent. Todos los derechos reservados.`,
+                                        [{ text: 'OK' }]
+                                    )
+                                }
+                            />
+                        </View>
 
-                        <View style={styles.drawerSubDivider} />
-
-                        <DrawerItem
-                            icon="help-circle-outline"
-                            label="Ayuda y soporte"
-                            onPress={() =>
-                                Linking.openURL('mailto:soporte@forevent.com.ar?subject=Soporte%20Forevent%20App')
-                                    .catch(() => Alert.alert('Soporte', 'Escribinos a soporte@forevent.com.ar'))
-                            }
-                        />
-                        <DrawerItem
-                            icon="information-outline"
-                            label="Acerca de Forevent"
-                            onPress={() =>
-                                Alert.alert(
-                                    'Forevent',
-                                    `Versión ${appVersion}\n\n© ${new Date().getFullYear()} Forevent. Todos los derechos reservados.`,
-                                    [{ text: 'OK' }]
-                                )
-                            }
-                        />
-
-                        <View style={styles.drawerSubDivider} />
-
-                        <DrawerItem
-                            icon="logout"
-                            label="Cerrar sesión"
-                            variant="danger"
-                            onPress={handleLogout}
-                        />
+                        <View style={styles.drawerGroup}>
+                            <DrawerItem
+                                icon="logout"
+                                label="Cerrar sesión"
+                                tint="danger"
+                                last
+                                onPress={handleLogout}
+                            />
+                        </View>
                     </ScrollView>
 
                     <Text style={styles.drawerVersion}>v{appVersion}</Text>
@@ -485,40 +510,53 @@ export default function Page() {
 }
 
 // ─── Drawer row ────────────────────────────────────────────────────────────────
+const TINTS = {
+    magenta: { bg: 'rgba(255,0,255,0.14)', fg: C.magenta },
+    purple:  { bg: 'rgba(139,92,246,0.16)', fg: C.purple },
+    neutral: { bg: 'rgba(255,255,255,0.07)', fg: C.dim },
+    danger:  { bg: C.dangerBg, fg: C.danger },
+} as const
+
 function DrawerItem({
     icon,
     label,
     onPress,
-    variant,
+    tint = 'neutral',
+    last,
 }: {
     icon: React.ComponentProps<typeof MaterialCommunityIcons>['name']
     label: string
     onPress: () => void
-    variant?: 'danger'
+    tint?: keyof typeof TINTS
+    last?: boolean
 }) {
-    const isDanger = variant === 'danger'
+    const isDanger = tint === 'danger'
+    const { bg, fg } = TINTS[tint]
+    // NativeWind v4 no invoca la forma de función de `style` (nativewind#1105):
+    // los estilos se descartan y la fila cae a layout de columna. Usamos la forma
+    // de array con estado propio para el feedback de pulsado.
+    const [pressed, setPressed] = useState(false)
     return (
         <Pressable
             onPress={onPress}
-            style={({ pressed }) => [
+            onPressIn={() => setPressed(true)}
+            onPressOut={() => setPressed(false)}
+            style={[
                 styles.drawerItem,
+                !last && styles.drawerItemBorder,
                 pressed && { backgroundColor: 'rgba(255,255,255,0.05)' },
             ]}
             android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
         >
-            <MaterialCommunityIcons
-                name={icon}
-                size={20}
-                color={isDanger ? '#ef4444' : C.white}
-            />
-            <Text style={[styles.drawerItemText, isDanger && { color: '#ef4444' }]}>
+            <View style={[styles.drawerItemIconChip, { backgroundColor: bg }]}>
+                <MaterialCommunityIcons name={icon} size={16} color={fg} />
+            </View>
+            <Text style={[styles.drawerItemText, isDanger && { color: C.danger }]}>
                 {label}
             </Text>
-            <MaterialCommunityIcons
-                name="chevron-right"
-                size={18}
-                color={isDanger ? 'rgba(239,68,68,0.45)' : C.dim}
-            />
+            {!isDanger && (
+                <MaterialCommunityIcons name="chevron-right" size={18} color={C.dim} />
+            )}
         </Pressable>
     )
 }
@@ -667,13 +705,24 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     drawerAvatarWrap: {
-        width: 62,
-        height: 62,
-        borderRadius: 31,
-        padding: 2,
-        borderWidth: 2,
-        borderColor: C.magenta,
-        marginBottom: 10,
+        width: 64,
+        height: 64,
+        marginBottom: 12,
+    },
+    drawerAvatarGlow: {
+        position: 'absolute',
+        top: -8,
+        left: -8,
+        right: -8,
+        bottom: -8,
+        borderRadius: 40,
+        backgroundColor: 'rgba(255,0,255,0.22)',
+    },
+    drawerAvatarRing: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        padding: 2.5,
     },
     drawerAvatar: {
         width: '100%',
@@ -683,57 +732,88 @@ const styles = StyleSheet.create({
     },
     drawerUserName: {
         color: C.white,
-        fontSize: 17,
-        fontWeight: '800',
-        letterSpacing: 0.2,
+        fontSize: 18,
+        fontWeight: '700',
+        letterSpacing: 0.1,
     },
     drawerUserEmail: {
         color: C.dim,
         fontSize: 12,
+        marginTop: 1,
     },
     drawerRolePill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 6,
         alignSelf: 'flex-start',
-        marginTop: 6,
+        marginTop: 9,
         paddingHorizontal: 10,
-        paddingVertical: 4,
-        backgroundColor: 'rgba(255,0,255,0.10)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,0,255,0.28)',
+        paddingVertical: 5,
+        backgroundColor: 'rgba(255,0,255,0.12)',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: 'rgba(255,0,255,0.30)',
         borderRadius: 50,
+    },
+    drawerRolePillDot: {
+        width: 5,
+        height: 5,
+        borderRadius: 3,
+        backgroundColor: C.magenta,
     },
     drawerRolePillText: {
         color: C.magenta,
-        fontSize: 10,
-        fontWeight: '800',
-        letterSpacing: 0.6,
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    },
+    drawerScroll: {
+        flex: 1,
+    },
+    drawerScrollContent: {
+        paddingTop: 4,
+        paddingHorizontal: 16,
+        paddingBottom: 6,
+    },
+    drawerGroupLabel: {
+        color: 'rgba(255,255,255,0.32)',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.7,
         textTransform: 'uppercase',
+        marginBottom: 8,
+        marginLeft: 4,
     },
-    drawerDivider: {
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: C.border,
-        marginHorizontal: 16,
-    },
-    drawerSubDivider: {
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: C.border,
-        marginVertical: 6,
-        marginHorizontal: 16,
+    drawerGroup: {
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: C.border,
+        overflow: 'hidden',
+        marginBottom: 20,
     },
     drawerItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
-        paddingHorizontal: 20,
-        paddingVertical: 13,
+        gap: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    drawerItemBorder: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
+    },
+    drawerItemIconChip: {
+        width: 30,
+        height: 30,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     drawerItemText: {
         flex: 1,
         color: C.white,
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '500',
     },
     drawerVersion: {
         color: C.dim,

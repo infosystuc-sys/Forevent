@@ -357,11 +357,13 @@ export default function ProductsScreen() {
                         <Text style={styles.cartTotal}>${cartTotal.toFixed(2)}</Text>
                     </View>
                     <Pressable
-                        style={({ pressed }) => [
+                        // NativeWind v4 descarta la forma de función de `style`
+                        // (nativewind#1105) — el botón perdia todos sus estilos.
+                        style={[
                             styles.cartBtn,
-                            pressed && { opacity: 0.8 },
                             purchaseMutation.isPending && { opacity: 0.6 },
                         ]}
+                        android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
                         onPress={handleConfirmOrder}
                         disabled={purchaseMutation.isPending}
                     >

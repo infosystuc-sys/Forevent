@@ -47,7 +47,7 @@ import { customdayjs } from "~/lib/constants"
 import { api } from "~/trpc/react"
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar"
 
-const TAX_TYPES = [
+export const TAX_TYPES = [
     "IVA Responsable Inscripto",
     "IVA Responsable no Inscripto",
     "IVA no Responsable",

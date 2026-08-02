@@ -198,16 +198,19 @@ export const guildRouter = createTRPCRouter({
             });
         }
 
+        // El dueño se valida por `ownerEmail`, no por `email` (que es el de la
+        // organización). Antes se buscaba `body.email` y rechazaba altas válidas
+        // cuando ambos correos no coincidían.
         const owner = await ctx.prisma.user.findUnique({
             where: {
-                email: body.email
+                email: body.ownerEmail.toLowerCase()
             }
         })
 
         if (!owner) {
             throw new TRPCError({
-                code: 'CONFLICT',
-                message: 'Dueño de la organización no existe o esta dado de baja.',
+                code: 'NOT_FOUND',
+                message: 'No existe una cuenta de Forevent con el correo del dueño. Pedile que se registre y volvé a intentar.',
             });
         }
 
@@ -252,8 +255,18 @@ export const guildRouter = createTRPCRouter({
         const { guildId } = input
         const now = new Date()
 
-        const [employeeCount, pendingEvents, pastEvents, approvedEvents, rejectedEvents] =
-            await Promise.all([
+        const [
+            employeeCount,
+            pendingEvents,
+            pastEvents,
+            approvedEvents,
+            rejectedEvents,
+            revenueAgg,
+            ticketsSold,
+            capacityAgg,
+            activeEvents,
+            upcomingEvents,
+        ] = await Promise.all([
                 ctx.prisma.userOnGuild.count({
                     where: { guildId, discharged: true, status: "ACCEPTED" },
                 }),
@@ -261,7 +274,46 @@ export const guildRouter = createTRPCRouter({
                 ctx.prisma.event.count({ where: { guildId, endsAt: { lt: now } } }),
                 ctx.prisma.event.count({ where: { guildId, status: "ACCEPTED" } }),
                 ctx.prisma.event.count({ where: { guildId, status: "REJECTED" } }),
+                // Ingresos: solo compras confirmadas de eventos de esta organización.
+                ctx.prisma.purchase.aggregate({
+                    _sum: { total: true },
+                    where: { status: "ACCEPTED", event: { guildId } },
+                }),
+                ctx.prisma.userTicket.count({
+                    where: { discharged: true, ticket: { event: { guildId } } },
+                }),
+                ctx.prisma.eventTicket.aggregate({
+                    _sum: { quantity: true },
+                    where: { event: { guildId } },
+                }),
+                ctx.prisma.event.count({
+                    where: { guildId, status: "ACCEPTED", endsAt: { gte: now } },
+                }),
+                ctx.prisma.event.findMany({
+                    where: { guildId, endsAt: { gte: now } },
+                    orderBy: { startsAt: "asc" },
+                    take: 5,
+                    select: {
+                        id: true,
+                        name: true,
+                        image: true,
+                        status: true,
+                        startsAt: true,
+                        tickets: { select: { id: true, quantity: true } },
+                    },
+                }),
             ])
+
+        // Vendidas por evento: una sola consulta agrupada sobre los tickets listados.
+        const upcomingTicketIds = upcomingEvents.flatMap((e) => e.tickets.map((t) => t.id))
+        const soldByTicket = upcomingTicketIds.length
+            ? await ctx.prisma.userTicket.groupBy({
+                by: ["ticketId"],
+                where: { discharged: true, ticketId: { in: upcomingTicketIds } },
+                _count: { _all: true },
+            })
+            : []
+        const soldMap = new Map(soldByTicket.map((r) => [r.ticketId, r._count._all]))
 
         return {
             employeeCount,
@@ -269,6 +321,23 @@ export const guildRouter = createTRPCRouter({
             pastEvents,
             approvedEvents,
             rejectedEvents,
+            revenue: revenueAgg._sum.total ?? 0,
+            ticketsSold,
+            capacity: capacityAgg._sum.quantity ?? 0,
+            activeEvents,
+            upcomingEvents: upcomingEvents.map((e) => {
+                const capacity = e.tickets.reduce((acc, t) => acc + t.quantity, 0)
+                const sold = e.tickets.reduce((acc, t) => acc + (soldMap.get(t.id) ?? 0), 0)
+                return {
+                    id: e.id,
+                    name: e.name,
+                    image: e.image,
+                    status: e.status,
+                    startsAt: e.startsAt,
+                    capacity,
+                    sold,
+                }
+            }),
         }
     }),
 

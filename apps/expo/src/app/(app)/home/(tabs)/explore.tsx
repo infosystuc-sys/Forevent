@@ -230,19 +230,25 @@ export default function ExplorePage() {
                         <Marker
                             key={event.id}
                             coordinate={{ latitude: lat, longitude: lng }}
-                            onPress={() => showCard({
-                                id: event.id,
-                                name: event.name,
-                                image: event.image ?? null,
-                                startsAt: event.startsAt,
-                                location: event.location
-                                    ? {
-                                        name: event.location.name,
-                                        address: event.location.address,
-                                        city: event.location.city,
-                                    }
-                                    : null,
-                            })}
+                            onPress={(e) => {
+                                // En iOS, con markers custom, el toque se propaga al onPress
+                                // del MapView (hideCard) después del onPress del Marker —
+                                // sin esto la tarjeta se abre y se cierra en el mismo tap.
+                                e.stopPropagation()
+                                showCard({
+                                    id: event.id,
+                                    name: event.name,
+                                    image: event.image ?? null,
+                                    startsAt: event.startsAt,
+                                    location: event.location
+                                        ? {
+                                            name: event.location.name,
+                                            address: event.location.address,
+                                            city: event.location.city,
+                                        }
+                                        : null,
+                                })
+                            }}
                         >
                             <View style={[styles.markerPin, isSelected && styles.markerPinSelected]}>
                                 <View style={[styles.markerDot, isSelected && styles.markerDotSelected]} />
@@ -298,10 +304,10 @@ export default function ExplorePage() {
                             </View>
                         </View>
                         <Pressable
-                            style={({ pressed }) => [
-                                styles.cardBtn,
-                                pressed && styles.cardBtnPressed,
-                            ]}
+                            // NativeWind v4 descarta la forma de función de `style`
+                            // (nativewind#1105) — el botón perdia todos sus estilos.
+                            style={styles.cardBtn}
+                            android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
                             onPress={() => {
                                 const id = selectedEvent.id
                                 hideCard()

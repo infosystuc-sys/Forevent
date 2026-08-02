@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import AdminNav from "~/app/_components/admin/nav";
+import AdminSidebarNav from "~/app/_components/admin/sidebar-nav";
 
 export default async function RootLayout({
   children,
@@ -7,14 +7,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex-1">
-      <Suspense fallback={<div className="border-b h-24" />}>
-        <AdminNav options={{ logo: true, nav: true, menu: true, selector: true }} />
+    <div className="flex min-h-screen flex-1 flex-col md:flex-row">
+      <Suspense fallback={<div className="w-full border-b md:h-screen md:w-64 md:border-b-0 md:border-r" />}>
+        <AdminSidebarNav />
       </Suspense>
-      <div className="py-6">
+      <main className="min-w-0 flex-1 px-4 py-6 md:px-8">
         {children}
-      </div>
+      </main>
     </div>
   );
 }
-

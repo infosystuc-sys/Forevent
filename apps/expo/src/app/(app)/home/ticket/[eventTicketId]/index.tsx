@@ -1034,11 +1034,12 @@ export default function Page() {
             <Text style={styles.cartFooterTotal}>${cartTotal.toFixed(2)}</Text>
           </View>
           <Pressable
-            style={({ pressed }) => [
+            // NativeWind v4 descarta la forma de función de `style` (nativewind#1105).
+            style={[
               styles.cartFooterBtn,
-              pressed && { opacity: 0.8 },
               purchaseMutation.isPending && { opacity: 0.6 },
             ]}
+            android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
             onPress={handleConfirmOrder}
             disabled={purchaseMutation.isPending}
           >
