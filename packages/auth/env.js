@@ -8,7 +8,12 @@ export const env = createEnv({
         ? z.string().min(1)
         : z.string().min(1).optional(),
     AUTH_URL: z.preprocess(
-      (str) => process.env.VERCEL_URL ?? str,
+      // AUTH_URL tiene prioridad absoluta.
+      // Solo usamos VERCEL_URL como fallback (con el prefijo https://) si AUTH_URL no está definida.
+      // Esto evita que la URL temporal del preview deployment sobreescriba la URL de producción.
+      (str) =>
+        process.env.AUTH_URL ??
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : str),
       process.env.VERCEL ? z.string() : z.string().url(),
     ),
     GOOGLE_CLIENT_ID: z.string().min(1),
