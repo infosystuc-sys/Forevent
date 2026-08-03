@@ -29,7 +29,13 @@ export const {
   signIn,
   signOut,
 } = NextAuth({
-  trustHost: true,
+  // En next-auth v5 beta, `trustHost: true` hace que NextAuth use el host del
+  // request HTTP para construir la redirect_uri. En Vercel ese host puede ser
+  // la URL temporal del deployment (con hash), no la URL de producción.
+  // En lugar de trustHost, usamos AUTH_URL explícitamente para que siempre se
+  // use la URL canónica de producción configurada en las variables de entorno.
+  // AUTH_TRUST_HOST=1 debe estar seteado en Vercel para permitir el proxy.
+  ...(process.env.AUTH_URL ? { url: process.env.AUTH_URL } : { trustHost: true }),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
