@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 
+import { assertStaffAction } from "~/lib/staff"
+
 const guildSchema = z.object({
     name: z.string().min(2, "Nombre requerido"),
     email: z.string().email("Email inválido").toLowerCase(),
@@ -19,12 +21,13 @@ const guildSchema = z.object({
     userLimit: z.coerce.number().int().min(1),
     commissionRate: z.coerce.number().min(0).max(100),
     expiresAt: z.string().min(1, "Fecha de vencimiento requerida"),
-    status: z.enum(["PENDING", "ACCEPTED", "REJECTED", "CANCELLED", "DRAFT"]),
+    status: z.enum(["PENDING", "ACCEPTED", "REJECTED", "CANCELLED", "DRAFT", "PAUSED"]),
     discharged: z.coerce.boolean(),
     image: z.string().url().optional().or(z.literal("")),
 })
 
 export async function createOrganizationAction(formData: FormData) {
+    await assertStaffAction()
     const raw = {
         name: formData.get("name"),
         email: formData.get("email"),
@@ -65,6 +68,7 @@ export async function createOrganizationAction(formData: FormData) {
 }
 
 export async function updateOrganizationAction(id: string, formData: FormData) {
+    await assertStaffAction()
     const raw = {
         name: formData.get("name"),
         email: formData.get("email"),
@@ -106,6 +110,7 @@ export async function updateOrganizationAction(id: string, formData: FormData) {
 }
 
 export async function deleteOrganizationAction(id: string) {
+    await assertStaffAction()
     await db.guild.update({
         where: { id },
         data: { discharged: false },
@@ -116,6 +121,7 @@ export async function deleteOrganizationAction(id: string) {
 }
 
 export async function toggleOrganizationStatus(id: string, currentStatus: Status) {
+    await assertStaffAction()
     const next = currentStatus === Status.ACCEPTED ? Status.PENDING : Status.ACCEPTED
     await db.guild.update({
         where: { id },
@@ -125,6 +131,7 @@ export async function toggleOrganizationStatus(id: string, currentStatus: Status
 }
 
 export async function permanentDeleteOrganizationAction(id: string) {
+    await assertStaffAction()
     const eventCount = await db.event.count({ where: { guildId: id } })
 
     if (eventCount > 0) {

@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { HOST_URL, NOREPLY_EMAIL, dayjs } from "../../lib/utils";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { assertGuildAccess } from "../../lib/authz";
 
 export const userOnGuildRouter = createTRPCRouter({
     getEmployees: protectedProcedure.input(
@@ -12,6 +13,7 @@ export const userOnGuildRouter = createTRPCRouter({
         }),
     ).query(async ({ ctx, input }) => {
         const { guildId } = input
+        await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId })
         const employees = await ctx.prisma.userOnGuild.findMany({
             where: {
                 //role: { notIn: ['OWNER'] },
@@ -53,7 +55,7 @@ export const userOnGuildRouter = createTRPCRouter({
         })
     ).mutation(async ({ ctx, input }) => {
         const body = input
-        console.log(input, "yeah buddy!!!")
+        await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId: body.guildId })
         const user = await ctx.prisma.user.findUnique({
             where: { email: body.email },
             include: {
@@ -143,7 +145,7 @@ export const userOnGuildRouter = createTRPCRouter({
         }
     }),
 
-    modifyInvite: publicProcedure.input(
+    modifyInvite: protectedProcedure.input(
         z.object({
             inviteId: z.string(),
             action: z.string(),
@@ -151,10 +153,9 @@ export const userOnGuildRouter = createTRPCRouter({
     ).mutation(async ({ ctx, input }) => {
         const body = input
 
-        console.log(input, "yeah buddy!")
-
         const exists = await ctx.prisma.invite.findUnique({
-            where: { id: body.inviteId }
+            where: { id: body.inviteId },
+            include: { user: { select: { email: true } } },
         })
 
         if (!exists) {
@@ -162,6 +163,14 @@ export const userOnGuildRouter = createTRPCRouter({
                 code: 'NOT_FOUND',
                 message: 'La invitacion no existe',
             });
+        }
+
+        // Cancelar ('discharge') es del dueño/manager de la organización; aceptar o
+        // rechazar sólo lo puede hacer el invitado.
+        if (body.action === 'discharge') {
+            await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId: exists.guildId })
+        } else if (exists.user.email.toLowerCase() !== ctx.session.user.email?.toLowerCase()) {
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Esta invitación no es para tu cuenta' })
         }
 
         if (body.action === 'discharge') {
@@ -293,13 +302,14 @@ export const userOnGuildRouter = createTRPCRouter({
 
     getInvites: protectedProcedure.input(
         z.object({
-            email: z.string().email().toLowerCase(),
-        })
-    ).query(async ({ ctx, input }) => {
-        const body = input
+            email: z.string().optional(),
+        }).optional()
+    ).query(async ({ ctx }) => {
+        const email = ctx.session.user.email?.toLowerCase()
+        if (!email) throw new TRPCError({ code: 'UNAUTHORIZED' })
 
         const invites = await ctx.prisma.invite.findMany({
-            where: { user: { email: body.email }, status: "PENDING", discharged: true },
+            where: { user: { email }, status: "PENDING", discharged: true },
             include: { guild: true }
         })
 
@@ -312,6 +322,7 @@ export const userOnGuildRouter = createTRPCRouter({
         })
     ).query(async ({ ctx, input }) => {
         const { guildId } = input
+        await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId })
 
         const invites = await ctx.prisma.invite.findMany({
             where: { guildId },

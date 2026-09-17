@@ -1,18 +1,10 @@
-import { auth } from '@forevent/auth'
 import { Briefcase, CalendarCheck2, CalendarClock } from 'lucide-react'
-import { redirect } from 'next/navigation'
 import { api } from '~/trpc/server'
 import SummaryCard from '~/app/_components/admin/summary-card'
 
 export default async function Home() {
+    // El layout de /internal/v1 ya exige Super Usuario; la API además usa internalProcedure.
     const stats = await api.web.internal.stats()
-    const session = await auth()
-    console.log(session, "SESSION!")
-    const checkAuth = await api.web.internal.internalUser({ email: session?.user?.email! })
-
-    if (!checkAuth) {
-        redirect("/v1")
-    }
 
     return (
         <div>

@@ -12,6 +12,7 @@ const PAGE_SIZE = 20
 const statusClasses: Record<Status, string> = {
     [Status.ACCEPTED]: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20",
     [Status.DRAFT]: "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+    [Status.PAUSED]: "bg-orange-500/10 text-orange-600 border border-orange-500/20",
     [Status.PENDING]: "bg-blue-500/10 text-blue-600 border border-blue-500/20",
     [Status.CANCELLED]: "bg-rose-500/10 text-rose-600 border border-rose-500/20",
     [Status.REJECTED]: "bg-slate-500/10 text-slate-600 border border-slate-500/20",
@@ -20,6 +21,7 @@ const statusClasses: Record<Status, string> = {
 const statusLabels: Record<Status, string> = {
     [Status.ACCEPTED]: "Activa",
     [Status.DRAFT]: "Borrador",
+    [Status.PAUSED]: "Pausada",
     [Status.PENDING]: "Pendiente",
     [Status.CANCELLED]: "Cancelada",
     [Status.REJECTED]: "Rechazada",

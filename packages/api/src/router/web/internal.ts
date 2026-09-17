@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { TRPCError } from "@trpc/server";
 import { dayjs } from "../../lib/utils";
-import { createTRPCRouter, publicProcedure } from "../../trpc";
+import { createTRPCRouter, internalProcedure } from "../../trpc";
 
 export const internalRouter = createTRPCRouter({
-    stats: publicProcedure.query(async ({ ctx }) => {
+    stats: internalProcedure.query(async ({ ctx }) => {
         const guilds = await ctx.prisma.guild.count({
             where: {
                 discharged: true,
@@ -63,7 +63,7 @@ export const internalRouter = createTRPCRouter({
         }
     }),
 
-    pendingEvents: publicProcedure.query(async ({ ctx }) => {
+    pendingEvents: internalProcedure.query(async ({ ctx }) => {
         const events = await ctx.prisma.event.findMany({
             where: {
                 discharged: true,
@@ -99,7 +99,7 @@ export const internalRouter = createTRPCRouter({
         return events
     }),
 
-    allGuilds: publicProcedure.query(async ({ ctx }) => {
+    allGuilds: internalProcedure.query(async ({ ctx }) => {
         const guilds = await ctx.prisma.guild.findMany({
             select: {
                 id: true,
@@ -136,12 +136,12 @@ export const internalRouter = createTRPCRouter({
         return guilds
     }),
 
-    internalUser: publicProcedure.input(z.object({
-        email: z.string().email().toLowerCase(),
-    })).query(async ({ ctx, input }) => {
+    // Devuelve el perfil del Super Usuario de la sesión. La identidad sale de
+    // `ctx.staff` (resuelto por internalProcedure), nunca del input.
+    internalUser: internalProcedure.query(async ({ ctx }) => {
         const user = await ctx.prisma.internalUser.findFirst({
             where: {
-                email: input.email,
+                id: ctx.staff.id,
             },
             select: {
                 id: true,
@@ -164,7 +164,7 @@ export const internalRouter = createTRPCRouter({
         return user
     }),
 
-    pendingLocations: publicProcedure.query(async ({ ctx }) => {
+    pendingLocations: internalProcedure.query(async ({ ctx }) => {
         return await ctx.prisma.location.findMany({
             where: {
                 discharged: true,
@@ -179,7 +179,7 @@ export const internalRouter = createTRPCRouter({
         })
     }),
 
-    eventById: publicProcedure.input(z.object({
+    eventById: internalProcedure.input(z.object({
         eventId: z.string()
     })).query(async ({ ctx, input }) => {
         return await ctx.prisma.event.findUnique({
@@ -210,7 +210,7 @@ export const internalRouter = createTRPCRouter({
         })
     }),
 
-    locationById: publicProcedure.input(z.object({
+    locationById: internalProcedure.input(z.object({
         locationId: z.string()
     })).query(async ({ ctx, input }) => {
         return await ctx.prisma.location.findUnique({
@@ -220,7 +220,7 @@ export const internalRouter = createTRPCRouter({
         })
     }),
 
-    modifyEvent: publicProcedure.input(z.object({
+    modifyEvent: internalProcedure.input(z.object({
         id: z.string(),
         status: z.enum(['ACCEPTED', 'REJECTED']),
         name: z.string().optional(),
@@ -264,7 +264,7 @@ export const internalRouter = createTRPCRouter({
         }
     }),
 
-    modifyLocation: publicProcedure.input(z.object({
+    modifyLocation: internalProcedure.input(z.object({
         id: z.string(),
         status: z.enum(['ACCEPTED', 'REJECTED'])
     })).mutation(async ({ ctx, input }) => {
@@ -279,17 +279,17 @@ export const internalRouter = createTRPCRouter({
         })
     }),
 
-    create: publicProcedure.input(z.object({
+    create: internalProcedure.input(z.object({
 
     })).mutation(({ ctx, input }) => {
         return
     }),
 
-    update: publicProcedure.input(CreatePostSchema).mutation(({ ctx, input }) => {
+    update: internalProcedure.input(CreatePostSchema).mutation(({ ctx, input }) => {
         return
     }),
 
-    "delete": publicProcedure.input(z.number()).mutation(({ ctx, input }) => {
+    "delete": internalProcedure.input(z.number()).mutation(({ ctx, input }) => {
         return
     }),
 });

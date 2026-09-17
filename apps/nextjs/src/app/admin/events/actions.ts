@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import db from "@forevent/db";
 import { uploadImageToS3 } from "~/lib/s3";
+import { assertStaffAction } from "~/lib/staff";
 
 // Convierte un valor de FormData a número decimal o null si está vacío/inválido.
 // Evita que z.coerce.number() trate el string vacío "" como 0.
@@ -34,6 +35,7 @@ export async function createEventAction(
   _prevState: { error: string | null },
   formData: FormData,
 ) {
+  await assertStaffAction();
   const parsed = createEventSchema.safeParse({
     name: formData.get("name")?.toString() ?? "",
     organizationId: formData.get("organizationId")?.toString() ?? "",
@@ -154,6 +156,7 @@ export async function updateEventAction(
   _prevState: { error: string | null },
   formData: FormData,
 ) {
+  await assertStaffAction();
   const parsed = updateEventSchema.safeParse({
     eventId: formData.get("eventId")?.toString() ?? "",
     name: formData.get("name")?.toString() ?? "",
@@ -310,6 +313,7 @@ export async function updateEventAction(
 }
 
 export async function deleteEventAction(eventId: string) {
+  await assertStaffAction();
   const deleted = await db.event.delete({ where: { id: eventId }, select: { guildId: true } });
   revalidateTag("admin-dashboard");
   if (deleted?.guildId) revalidateTag(`guild-${deleted.guildId}`);

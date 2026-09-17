@@ -79,6 +79,12 @@ export default function ScanScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const utils = api.useUtils();
 
+  // Conteo propio de accesos del empleado (PDF §4): se refresca tras cada escaneo.
+  const myScans = api.mobile.employeeOnEvent.myScanCount.useQuery(
+    { eventId: eventId ?? '' },
+    { enabled: !!eventId },
+  );
+
   // ── Show / hide result toast ──────────────────────────────────────────────
   const showResult = useCallback(
     (type: 'success' | 'error', message: string) => {
@@ -109,6 +115,7 @@ export default function ScanScreen() {
     onSuccess: () => {
       showResult('success', 'Entrada escaneada exitosamente');
       utils.mobile.event.invalidate();
+      utils.mobile.employeeOnEvent.myScanCount.invalidate({ eventId: eventId ?? '' });
     },
     onError: (error) => showResult('error', error.message),
   });
@@ -243,6 +250,15 @@ export default function ScanScreen() {
           <View style={styles.modeRow}>
             <MaterialCommunityIcons name="qrcode-scan" size={16} color={C.accent} />
             <Text style={styles.modeText}>Escaneando productos</Text>
+          </View>
+
+          {/* Mis accesos registrados */}
+          <View style={styles.modeRow}>
+            <MaterialCommunityIcons name="account-check" size={16} color={C.accent} />
+            <Text style={styles.modeText}>
+              Mis accesos: {myScans.data?.scanned ?? 0}
+              {myScans.data ? ` · Evento: ${myScans.data.totalEvent}` : ''}
+            </Text>
           </View>
         </View>
 

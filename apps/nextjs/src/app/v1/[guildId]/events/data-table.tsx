@@ -84,15 +84,18 @@ const columns: ColumnDef<Row>[] = [
         accessorKey: "status",
         header: "Estado del evento",
         cell: ({ row }) => {
-            const status = {
-                ACCEPTED: ['text-green-500', 'Aceptado'],
+            const status: Record<string, [string, string]> = {
+                DRAFT: ['text-neutral-400', 'Borrador'],
+                PENDING: ['text-yellow-500', 'Pendiente de aprobación'],
+                ACCEPTED: ['text-green-500', 'Publicado'],
+                PAUSED: ['text-orange-500', 'Pausado'],
                 REJECTED: ['text-red-500', 'Rechazado'],
-                CANCELLED: ['text-orange-500', 'Cancelado'],
-                PENDING: ['text-yellow-500', 'Pendiente']
+                CANCELLED: ['text-red-400', 'Dado de baja'],
             }
+            const [cls, label] = status[row.original.status] ?? ['', row.original.status]
             return (
-                <p className={status[row.original.status][0]}>
-                    {status[row.original.status][1]}
+                <p className={cls}>
+                    {label}
                 </p>
             )
         }

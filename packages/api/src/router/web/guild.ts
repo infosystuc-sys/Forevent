@@ -2,7 +2,8 @@ import ConfirmGuildEmailTemplate from "@forevent/ui/confirmguildemail";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { NOREPLY_EMAIL, dayjs } from "../../lib/utils";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { createTRPCRouter, internalProcedure, protectedProcedure, publicProcedure } from "../../trpc";
+import { assertGuildAccess } from "../../lib/authz";
 
 export const guildRouter = createTRPCRouter({
     all: publicProcedure.input(z.object({
@@ -57,12 +58,17 @@ export const guildRouter = createTRPCRouter({
         return guild
     }),
 
+    // Organizaciones del usuario de la sesión. El `email` del input se ignora:
+    // la identidad sale siempre de la sesión para no listar guilds de terceros.
     getGuilds: protectedProcedure.input(
         z.object({
-            email: z.string().email().toLowerCase(),
-        }),
-    ).query(async ({ ctx, input }) => {
-        const email = input.email
+            email: z.string().optional(),
+        }).optional(),
+    ).query(async ({ ctx }) => {
+        const email = ctx.session.user.email?.toLowerCase()
+        if (!email) {
+            throw new TRPCError({ code: 'UNAUTHORIZED' })
+        }
         const guilds = await ctx.prisma.userOnGuild.findMany({
             where: {
                 user: { email: email },
@@ -155,7 +161,8 @@ export const guildRouter = createTRPCRouter({
         return sendEmail
     }),
 
-    createGuild: publicProcedure.input(z.object({
+    // Alta de organizaciones: la hace el equipo de Forevent desde /internal/v1/guilds.
+    createGuild: internalProcedure.input(z.object({
         name: z.string(),
         taxType: z.string(),
         identifier: z.string().max(11).min(8),
@@ -253,6 +260,7 @@ export const guildRouter = createTRPCRouter({
         })
     ).query(async ({ ctx, input }) => {
         const { guildId } = input
+        await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId })
         const now = new Date()
 
         const [
@@ -345,6 +353,7 @@ export const guildRouter = createTRPCRouter({
         guildId: z.string()
     })).query(async ({ ctx, input }) => {
         const { guildId } = input
+        await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId })
 
         const [totalAgg, eventTotalsAgg, events, productItemGroups, ticketItemGroups] =
             await Promise.all([

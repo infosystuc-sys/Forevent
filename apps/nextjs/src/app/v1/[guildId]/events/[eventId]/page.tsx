@@ -1,5 +1,5 @@
 import Image from "next/image";
-import EventStatusSelect from "~/app/_components/admin/event/event-status-select";
+import EventStatusActions from "~/app/_components/admin/event/event-status-actions";
 import EventSummary from "~/app/_components/admin/event/event-summary";
 import Return from "~/app/_components/return";
 import { Separator } from "~/app/_components/ui/separator";
@@ -19,11 +19,10 @@ export default async function DashboardPage({ params }: { params: { guildId: str
         <div>
           <h1 className="text-3xl font-bold my-3 tracking-wider">{eventSummary.event?.name}</h1>
           {eventSummary.event && (
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold text-muted-foreground">Estado:</span>
-              <EventStatusSelect
+            <div className="my-3">
+              <EventStatusActions
                 eventId={params.eventId}
-                currentStatus={eventSummary.event.status as "ACCEPTED" | "PENDING" | "CANCELLED" | "REJECTED" | "DRAFT"}
+                currentStatus={eventSummary.event.status}
               />
             </div>
           )}

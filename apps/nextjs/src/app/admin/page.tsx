@@ -23,6 +23,8 @@ const statusClasses: Record<Status, string> = {
     "bg-rose-500/10 text-rose-600 border border-rose-500/20",
   [Status.REJECTED]:
     "bg-slate-500/10 text-slate-600 border border-slate-500/20",
+  [Status.PAUSED]:
+    "bg-orange-500/10 text-orange-600 border border-orange-500/20",
 };
 
 const statusLabels: Record<Status, string> = {
@@ -31,6 +33,7 @@ const statusLabels: Record<Status, string> = {
   [Status.PENDING]: "Pendiente",
   [Status.CANCELLED]: "Cancelado",
   [Status.REJECTED]: "Rechazado",
+  [Status.PAUSED]: "Pausado",
 };
 
 const PAGE_SIZE = 20;
@@ -226,7 +229,13 @@ export default async function AdminDashboard({
           )}
           {events.map((event) => {
             const isActive = event.status === Status.ACCEPTED;
-            const toggleLabel = isActive ? "Pausar" : "Publicar";
+            const toggleLabel = isActive
+              ? "Pausar"
+              : event.status === Status.PAUSED
+                ? "Reanudar"
+                : event.status === Status.PENDING
+                  ? "Aprobar y publicar"
+                  : "Publicar";
             const capacity = event.tickets.reduce(
               (total, ticket) => total + ticket.quantity,
               0,

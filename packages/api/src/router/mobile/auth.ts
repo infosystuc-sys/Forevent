@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure, mobileProtectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
@@ -294,10 +294,12 @@ export const authRouter = createTRPCRouter({
   }),
 
   // ─── Employee status check ─────────────────────────────────────────────────
-  checkEmployeeStatus: publicProcedure.input(z.object({
-    userId: z.string(),
-  })).query(async ({ ctx, input }) => {
-    const { userId } = input;
+  // Asignaciones como empleado del usuario de la sesión. El `userId` del input se
+  // ignora: se usa el del bearer token para no exponer asignaciones de terceros.
+  checkEmployeeStatus: mobileProtectedProcedure.input(z.object({
+    userId: z.string().optional(),
+  }).optional()).query(async ({ ctx }) => {
+    const userId = ctx.user.id;
 
     const assignments = await ctx.prisma.userOnGuild.findMany({
       where: {

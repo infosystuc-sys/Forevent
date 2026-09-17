@@ -4,8 +4,8 @@ import { Button } from "~/app/_components/ui/button"
 import { api } from "~/trpc/server"
 import { DataTable } from "./data-table"
 
-type Search = 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'PENDING' | 'PAST'
-const searchStrings: Search[] = ['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'PAST']
+type Search = 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'PENDING' | 'DRAFT' | 'PAUSED' | 'PAST'
+const searchStrings: Search[] = ['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'DRAFT', 'PAUSED', 'PAST']
 
 export default async function LocationsPage({
   params,

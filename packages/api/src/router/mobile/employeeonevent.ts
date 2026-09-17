@@ -1,7 +1,7 @@
 import { CreatePostSchema } from "@forevent/validators";
 import { z } from "zod";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
+import { createTRPCRouter, mobileProtectedProcedure, protectedProcedure, publicProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 
 export const employeeOnEventRouter = createTRPCRouter({
@@ -71,13 +71,17 @@ export const employeeOnEventRouter = createTRPCRouter({
     return update
   }),
 
-  events: publicProcedure.input(z.object({
+  // Eventos asignados al empleado. El userOnGuildId debe pertenecer al usuario del
+  // token: un empleado sólo ve sus propios eventos asignados (PDF §4).
+  events: mobileProtectedProcedure.input(z.object({
     userOnGuildId: z.string()
   })).query(async ({ ctx, input }) => {
     const events = await ctx.prisma.employeeOnEvent.findMany({
       where: {
         userOnGuildId: input.userOnGuildId,
+        userOnGuild: { userId: ctx.user.id },
         discharged: true,
+        event: { discharged: true },
       },
       select: {
         event: {
@@ -106,6 +110,33 @@ export const employeeOnEventRouter = createTRPCRouter({
     })
 
     return events
+  }),
+
+  /**
+   * Conteo propio de accesos del empleado (PDF §4): entradas validadas por él en el evento.
+   * Se cuenta por `doorkeeperId` (UserOnGuild del que escaneó), derivado del token.
+   */
+  myScanCount: mobileProtectedProcedure.input(z.object({
+    eventId: z.string(),
+  })).query(async ({ ctx, input }) => {
+    const [scanned, totalEvent] = await Promise.all([
+      ctx.prisma.userTicket.count({
+        where: {
+          status: 'ACCEPTED',
+          discharged: true,
+          ticket: { eventId: input.eventId },
+          doorkeeper: { userId: ctx.user.id },
+        },
+      }),
+      ctx.prisma.userTicket.count({
+        where: {
+          status: 'ACCEPTED',
+          discharged: true,
+          ticket: { eventId: input.eventId },
+        },
+      }),
+    ])
+    return { scanned, totalEvent }
   }),
 
   "delete": protectedProcedure.input(z.number()).mutation(({ ctx, input }) => {

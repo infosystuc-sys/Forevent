@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { requireStaff } from "~/lib/staff";
+
 import { Button } from "@forevent/ui/button";
 
 const navItems = [
@@ -10,11 +12,14 @@ const navItems = [
   { label: "Configuración", href: "/admin#configuracion" },
 ];
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Web administrativa: exclusiva del Super Usuario (PDF §7).
+  await requireStaff();
+
   return (
     <div className="min-h-screen bg-background text-foreground md:flex">
       <aside className="hidden w-64 shrink-0 border-r bg-card/40 md:flex md:flex-col">

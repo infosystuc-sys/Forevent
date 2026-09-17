@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { dayjs } from "../../lib/utils";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { Status } from "@forevent/db";
+import { assertEventAccess, assertEventTransition, assertGuildAccess } from "../../lib/authz";
 
 export const eventRouter = createTRPCRouter({
   all: publicProcedure.query(({ ctx }) => {
@@ -12,7 +13,8 @@ export const eventRouter = createTRPCRouter({
     return
   }),
 
-  adminDetail: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+  adminDetail: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.id });
     const event = await ctx.prisma.event.findUnique({
       where: { id: input.id },
       select: {
@@ -171,6 +173,7 @@ export const eventRouter = createTRPCRouter({
 
   eventSummary: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
     const { eventId } = input
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId });
 
     const [event, salesTotal, artists, postsCount, usersCount, countersCount, gatesCount, employeesOnGates] = await Promise.all([
       ctx.prisma.event.findUnique({
@@ -211,7 +214,8 @@ export const eventRouter = createTRPCRouter({
     return { event, salesTotal, artists, postsCount, usersCount, employeesCount, countersCount, gatesCount }
   }),
 
-  countersAndGates: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  countersAndGates: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
     const event = await ctx.prisma.event.findUnique({
       where: {
         id: input.eventId
@@ -232,7 +236,8 @@ export const eventRouter = createTRPCRouter({
     return event
   }),
 
-  counters: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  counters: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
     const event = await ctx.prisma.event.findUnique({
       where: {
         id: input.eventId
@@ -252,7 +257,8 @@ export const eventRouter = createTRPCRouter({
     return event.counters
   }),
 
-  gates: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  gates: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
     const event = await ctx.prisma.event.findUnique({
       where: {
         id: input.eventId
@@ -272,7 +278,8 @@ export const eventRouter = createTRPCRouter({
     return event.gates
   }),
 
-  employeesNotOnEvent: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  employeesNotOnEvent: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
     const event = await ctx.prisma.event.findUnique({
       where: {
         id: input.eventId,
@@ -318,7 +325,8 @@ export const eventRouter = createTRPCRouter({
     return employees
   }),
 
-  products: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  products: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
     const { eventId } = input
     return await ctx.prisma.product.findMany({
       where: {
@@ -328,7 +336,8 @@ export const eventRouter = createTRPCRouter({
     })
   }),
 
-  deals: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  deals: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
     const { eventId } = input
     return await ctx.prisma.deal.findMany({
       where: {
@@ -357,7 +366,8 @@ export const eventRouter = createTRPCRouter({
     })
   }),
 
-  deposits: publicProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+  deposits: protectedProcedure.input(z.object({ eventId: z.string() })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
     const { eventId } = input
     return await ctx.prisma.deposit.findMany({
       where: {
@@ -379,13 +389,14 @@ export const eventRouter = createTRPCRouter({
     })
   }),
 
-  byGuildId: publicProcedure.input(z.object({
+  byGuildId: protectedProcedure.input(z.object({
     guildId: z.string(),
-    q: z.optional(z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'PAST'])),
+    q: z.optional(z.enum(['ACCEPTED', 'REJECTED', 'CANCELLED', 'PENDING', 'DRAFT', 'PAUSED', 'PAST'])),
     page: z.number().int().min(1).default(1),
     pageSize: z.number().int().min(1).max(100).default(20),
   })).query(async ({ ctx, input }) => {
     const { guildId, q, page, pageSize } = input
+    await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId });
     const where = {
       guildId,
       discharged: true,
@@ -496,6 +507,8 @@ export const eventRouter = createTRPCRouter({
     ).optional(),
   })).mutation(async ({ ctx, input }) => {
     const { about, endsAt, gates, image, location, name, "private": priv, startsAt, tickets, artists, deposits, products, guildId } = input
+    // Sólo OWNER/MANAGER de la organización (o staff) pueden crear eventos en ella.
+    await assertGuildAccess(ctx.prisma, { email: ctx.session.user.email, guildId });
     return await ctx.prisma.$transaction(async (trans) => {
       const loc = await trans.location.create({
         data: location
@@ -512,6 +525,8 @@ export const eventRouter = createTRPCRouter({
           },
           startsAt: dayjs(startsAt).$d,
           category: 'BAR',
+          // Nace como borrador; el dueño lo envía a aprobación con `updateStatus` (PDF §8).
+          status: 'DRAFT',
           locationId: loc.id,
           "private": priv,
           guildId,
@@ -679,15 +694,9 @@ export const eventRouter = createTRPCRouter({
   })).mutation(async ({ ctx, input }) => {
     const { eventId, guildId, startsAt, endsAt, ...rest } = input;
 
-    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
-      where: {
-        guildId,
-        user: { email: ctx.session.user.email ?? undefined },
-        discharged: true,
-      },
-    });
-    if (!userOnGuild) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para modificar este evento" });
+    const { event } = await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId });
+    if (event.guildId !== guildId) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "El evento no pertenece a esta organización" });
     }
 
     return await ctx.prisma.event.update({
@@ -762,10 +771,10 @@ export const eventRouter = createTRPCRouter({
   })).mutation(async ({ ctx, input }) => {
     const { eventId, guildId, startsAt, endsAt, location, gates, tickets, artists, deposits, products, ...eventFields } = input;
 
-    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
-      where: { guildId, user: { email: ctx.session.user.email ?? undefined }, discharged: true },
-    });
-    if (!userOnGuild) throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para modificar este evento" });
+    const { event: existing } = await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId });
+    if (existing.guildId !== guildId) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "El evento no pertenece a esta organización" });
+    }
 
     const parseUTC = (s: string): Date => new Date(s.length === 16 ? s + 'Z' : s);
 
@@ -879,27 +888,22 @@ export const eventRouter = createTRPCRouter({
     }, { maxWait: 10000, timeout: 10000 });
   }),
 
+  /**
+   * Cambio de estado con máquina de estados (PDF §8/§9).
+   * Dueño/Manager: DRAFT|REJECTED → PENDING (enviar a aprobación), ACCEPTED → PAUSED,
+   * PAUSED → ACCEPTED (reanudar), * → CANCELLED (dar de baja).
+   * Publicar (→ ACCEPTED desde PENDING) y rechazar quedan reservados al Super Usuario.
+   */
   updateStatus: protectedProcedure.input(z.object({
     eventId: z.string(),
     status: z.nativeEnum(Status),
   })).mutation(async ({ ctx, input }) => {
-    const event = await ctx.prisma.event.findUnique({
-      where: { id: input.eventId },
-      select: { id: true, guildId: true },
+    const { event, access } = await assertEventAccess(ctx.prisma, {
+      email: ctx.session.user.email,
+      eventId: input.eventId,
     });
-    if (!event) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Evento no encontrado" });
-    }
-    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
-      where: {
-        guildId: event.guildId,
-        user: { email: ctx.session.user.email ?? undefined },
-        discharged: true,
-      },
-    });
-    if (!userOnGuild) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para modificar este evento" });
-    }
+    assertEventTransition(event.status, input.status, access.staff);
+
     return await ctx.prisma.event.update({
       where: { id: input.eventId },
       data: { status: input.status },
@@ -910,19 +914,14 @@ export const eventRouter = createTRPCRouter({
     eventId: z.string(),
     guildId: z.string(),
   })).mutation(async ({ ctx, input }) => {
-    const userOnGuild = await ctx.prisma.userOnGuild.findFirst({
-      where: {
-        guildId: input.guildId,
-        user: { email: ctx.session.user.email ?? undefined },
-        discharged: true,
-      },
-    });
-    if (!userOnGuild) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para eliminar este evento" });
+    const { event } = await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
+    if (event.guildId !== input.guildId) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "El evento no pertenece a esta organización" });
     }
+    // Dar de baja = CANCELLED + discharged (un solo mecanismo para el concepto del PDF §9).
     return await ctx.prisma.event.update({
       where: { id: input.eventId },
-      data: { discharged: false },
+      data: { discharged: false, status: 'CANCELLED' },
     });
   }),
 });

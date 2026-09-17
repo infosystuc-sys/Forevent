@@ -3,11 +3,13 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
+import { assertEventAccess } from "../../lib/authz";
 
 export const employeeOnEventRouter = createTRPCRouter({
   all: protectedProcedure.input(z.object({
     eventId: z.string()
   })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
 
     const allEmployees = await ctx.prisma.employeeOnEvent.findMany({
       where: {
@@ -90,14 +92,21 @@ export const employeeOnEventRouter = createTRPCRouter({
     return data
   }),
 
-  create: publicProcedure.input(z.object({
+  create: protectedProcedure.input(z.object({
     gateId: z.string().optional(),
     counterId: z.string().optional(),
     employeesIds: z.array(z.string()),
     eventId: z.string()
   })).mutation(async ({ ctx, input }) => {
     const { counterId, gateId, employeesIds, eventId } = input
-    console.log(input, 'inputs')
+    const { event } = await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId });
+    // Los empleados asignados deben pertenecer a la misma organización del evento.
+    const members = await ctx.prisma.userOnGuild.count({
+      where: { id: { in: employeesIds }, guildId: event.guildId, discharged: true },
+    });
+    if (members !== new Set(employeesIds).size) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Hay empleados que no pertenecen a esta organización' });
+    }
     return await ctx.prisma.employeeOnEvent.createMany({
       data: employeesIds.map(id => {
         return {
@@ -114,6 +123,7 @@ export const employeeOnEventRouter = createTRPCRouter({
     userOnGuildId: z.string(),
     eventId: z.string()
   })).query(async ({ ctx, input }) => {
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: input.eventId });
 
     const employee = await ctx.prisma.employeeOnEvent.findFirst({
       where: {
@@ -221,8 +231,7 @@ export const employeeOnEventRouter = createTRPCRouter({
   ).mutation(async ({ ctx, input }) => {
     const body = input
     const data = (({ userOnGuildId: employeeId, ...obj }) => obj)(body)
-
-    console.log(body, 'YEAH BUDDY')
+    await assertEventAccess(ctx.prisma, { email: ctx.session.user.email, eventId: body.eventId });
 
     const employee = await ctx.prisma.employeeOnEvent.findFirst({
       where: {
