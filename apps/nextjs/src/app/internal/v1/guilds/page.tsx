@@ -1,8 +1,12 @@
 import { api } from '~/trpc/server'
 import CreateGuildDialog from './create-guild-dialog'
 import { DataTable } from './data-table'
+import { requireStaff } from '~/lib/staff'
 
 export default async function Page() {
+  // Next renderiza layout y page en paralelo: el guard del layout no evita que el page
+  // consulte datos antes del redirect, así que cada página vuelve a exigir Super Usuario.
+  await requireStaff()
   const data = await api.web.internal.allGuilds()
   return (
     <div className="grow  rounded-xl px-20 bg-neutral-950 flex-col">

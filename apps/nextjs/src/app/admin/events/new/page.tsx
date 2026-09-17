@@ -2,8 +2,12 @@ import db from "@forevent/db";
 
 import { createEventAction } from "../actions";
 import CreateEventForm from "./form";
+import { requireStaff } from "~/lib/staff"
 
 export default async function NewEventPage() {
+  // Next renderiza layout y page en paralelo: el guard del layout no evita que el page
+  // consulte datos antes del redirect, así que cada página vuelve a exigir Super Usuario.
+  await requireStaff();
   const organizations = await db.guild.findMany({
     select: {
       id: true,

@@ -1,8 +1,12 @@
 import { Briefcase, CalendarCheck2, CalendarClock } from 'lucide-react'
 import { api } from '~/trpc/server'
 import SummaryCard from '~/app/_components/admin/summary-card'
+import { requireStaff } from '~/lib/staff'
 
 export default async function Home() {
+  // Next renderiza layout y page en paralelo: el guard del layout no evita que el page
+  // consulte datos antes del redirect, así que cada página vuelve a exigir Super Usuario.
+  await requireStaff()
     // El layout de /internal/v1 ya exige Super Usuario; la API además usa internalProcedure.
     const stats = await api.web.internal.stats()
 

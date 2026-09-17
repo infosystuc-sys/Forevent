@@ -11,6 +11,7 @@ import { toggleEventStatus } from "./actions";
 import { deleteEventAction } from "./events/actions";
 import DeleteEventButton from "./delete-event-button";
 import AdminToastListener from "./toast-listener";
+import { requireStaff } from "~/lib/staff"
 
 const statusClasses: Record<Status, string> = {
   [Status.ACCEPTED]:
@@ -72,6 +73,9 @@ export default async function AdminDashboard({
 }: {
   searchParams?: { page?: string };
 }) {
+  // Next renderiza layout y page en paralelo: el guard del layout no evita que el page
+  // consulte datos antes del redirect, así que cada página vuelve a exigir Super Usuario.
+  await requireStaff();
   const page = Math.max(1, Number(searchParams?.page ?? "1") || 1);
   const skip = (page - 1) * PAGE_SIZE;
 

@@ -6,6 +6,7 @@ import Link from "next/link"
 import AdminToastListener from "../toast-listener"
 import { deleteOrganizationAction, permanentDeleteOrganizationAction, toggleOrganizationStatus } from "./actions"
 import DeleteOrganizationButton from "./delete-organization-button"
+import { requireStaff } from "~/lib/staff"
 
 const PAGE_SIZE = 20
 
@@ -32,6 +33,9 @@ export default async function OrganizationsPage({
 }: {
     searchParams?: { page?: string }
 }) {
+  // Next renderiza layout y page en paralelo: el guard del layout no evita que el page
+  // consulte datos antes del redirect, así que cada página vuelve a exigir Super Usuario.
+  await requireStaff()
     const page = Math.max(1, Number(searchParams?.page ?? "1") || 1)
     const skip = (page - 1) * PAGE_SIZE
     const [organizations, totalCount] = await Promise.all([

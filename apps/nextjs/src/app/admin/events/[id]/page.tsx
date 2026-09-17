@@ -7,6 +7,7 @@ import { Button } from "~/app/_components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "~/app/_components/ui/card"
 import { customdayjs } from "~/lib/constants"
 import { api } from "~/trpc/server"
+import { requireStaff } from "~/lib/staff"
 
 const statusLabel: Record<string, string> = {
     ACCEPTED: "Publicado",
@@ -23,6 +24,9 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
 }
 
 export default async function AdminEventDetailPage({ params }: { params: { id: string } }) {
+  // Next renderiza layout y page en paralelo: el guard del layout no evita que el page
+  // consulte datos antes del redirect, así que cada página vuelve a exigir Super Usuario.
+  await requireStaff()
     const event = await api.web.event.adminDetail({ id: params.id }).catch(() => null)
 
     if (!event) {

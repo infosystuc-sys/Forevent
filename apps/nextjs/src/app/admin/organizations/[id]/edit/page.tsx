@@ -2,8 +2,12 @@ import db from "@forevent/db"
 import { notFound } from "next/navigation"
 import OrganizationForm from "../../form"
 import { updateOrganizationAction } from "../../actions"
+import { requireStaff } from "~/lib/staff"
 
 export default async function EditOrganizationPage({ params }: { params: { id: string } }) {
+  // Next renderiza layout y page en paralelo: el guard del layout no evita que el page
+  // consulte datos antes del redirect, así que cada página vuelve a exigir Super Usuario.
+  await requireStaff()
     const org = await db.guild.findUnique({
         where: { id: params.id },
         select: {
