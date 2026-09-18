@@ -151,8 +151,11 @@ export const {
       if (account?.provider === "google" && profile?.email) {
         const existing = await prisma.user.findUnique({
           where: { email: profile.email },
-          select: { id: true },
+          select: { id: true, discharged: true },
         });
+
+        // Cuenta desactivada por el Super Usuario: no se permite el ingreso.
+        if (existing && !existing.discharged) return false;
 
         if (!existing) {
           await prisma.user.create({

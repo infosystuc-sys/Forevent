@@ -11,6 +11,10 @@ const messages: Record<string, string> = {
   deleted: "Dado de baja correctamente",
   published: "Evento publicado",
   paused: "Evento pausado",
+  userDeactivated: "Cuenta desactivada",
+  userActivated: "Cuenta reactivada",
+  membershipRemoved: "Usuario quitado de la organización",
+  roleUpdated: "Rol actualizado",
 };
 
 export default function AdminToastListener() {

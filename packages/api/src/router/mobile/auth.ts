@@ -2,6 +2,9 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure, mobileProtectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
+
+// Mensaje único para cuentas desactivadas por el Super Usuario (PDF §7: gestionar usuarios).
+const DEACTIVATED_MESSAGE = "Tu cuenta fue desactivada. Escribinos a soporte@forevent.com.ar si creés que es un error.";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
 import { NOREPLY_EMAIL, dayjs } from "../../lib/utils";
@@ -246,7 +249,7 @@ export const authRouter = createTRPCRouter({
 
     const exists = await ctx.prisma.user.findUnique({
       where: { email: input.email },
-      select: { id: true, email: true },
+      select: { id: true, email: true, discharged: true },
     })
 
     if (!exists) {
@@ -255,6 +258,10 @@ export const authRouter = createTRPCRouter({
         code: "NOT_FOUND",
         message: 'No existe una cuenta con el email ingresado. ¿Deseas registrarte?',
       })
+    }
+
+    if (!exists.discharged) {
+      throw new TRPCError({ code: "FORBIDDEN", message: DEACTIVATED_MESSAGE })
     }
 
     const token = (Math.floor(Math.random() * 90000) + 10000).toString()
@@ -413,8 +420,13 @@ export const authRouter = createTRPCRouter({
         password: true,
         loginAttempts: true,
         lockUntil: true,
+        discharged: true,
       },
     });
+
+    if (user && !user.discharged) {
+      throw new TRPCError({ code: "FORBIDDEN", message: DEACTIVATED_MESSAGE })
+    }
 
     // Misma respuesta para email inexistente, contraseña incorrecta o cuenta
     // bloqueada (evita enumeración de usuarios y no revela el estado de lockout)
@@ -553,8 +565,13 @@ export const authRouter = createTRPCRouter({
           locale: true,
           zoneinfo: true,
           about: true,
+          discharged: true,
         },
       });
+
+      if (user && !user.discharged) {
+        throw new TRPCError({ code: "FORBIDDEN", message: DEACTIVATED_MESSAGE })
+      }
 
       if (!user) {
         // Primer login con Google → crear user. La password es un hash random que
@@ -581,6 +598,7 @@ export const authRouter = createTRPCRouter({
             locale: true,
             zoneinfo: true,
             about: true,
+            discharged: true,
           },
         });
       } else if (!user.image && profile.picture) {
@@ -596,6 +614,7 @@ export const authRouter = createTRPCRouter({
             locale: true,
             zoneinfo: true,
             about: true,
+            discharged: true,
           },
         });
       }

@@ -50,6 +50,7 @@ async function resolveMobileSession(headers: Headers) {
           about: true,
           locale: true,
           zoneinfo: true,
+          discharged: true,
         },
       },
     },
@@ -57,10 +58,13 @@ async function resolveMobileSession(headers: Headers) {
 
   if (!row || !row.user) return null;
   if (row.expiresAt.getTime() < Date.now()) return null;
+  // Usuario desactivado por el Super Usuario: la sesión deja de valer aunque el token siga vivo.
+  if (!row.user.discharged) return null;
 
+  const { discharged: _discharged, ...user } = row.user;
   return {
     sessionId: row.id,
-    user: row.user,
+    user,
   };
 }
 
