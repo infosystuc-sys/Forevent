@@ -5,7 +5,7 @@ import { cn } from "@forevent/ui";
 import { ThemeProvider, ThemeToggle } from "@forevent/ui/theme";
 import { Toaster } from "@forevent/ui/toast";
 
-import { env } from "~/env";
+import { getSiteUrl } from "~/lib/site-url";
 import { TRPCReactProvider } from "~/trpc/react";
 
 import "~/app/globals.css";
@@ -19,17 +19,15 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    env.VERCEL_ENV === "production"
-      ? "https://dashboard.foreventapp.com"
-      : "http://localhost:3000",
-  ),
+  // Derivada del entorno (AUTH_URL / NEXT_PUBLIC_BASE_URL / VERCEL_URL): foreventapp.com
+  // no está registrado, así que no se hardcodea ningún dominio acá.
+  metadataBase: new URL(getSiteUrl()),
   title: "Forevent",
   description: "Events, parties, and more. Find the best events in your city.",
   openGraph: {
     title: "Forevent",
     description: "Events, parties, and more. Find the best events in your city.",
-    url: "https://foreventapp.com",
+    url: getSiteUrl(),
     siteName: "Forevent",
   },
   twitter: {
