@@ -15,6 +15,10 @@ const messages: Record<string, string> = {
   userActivated: "Cuenta reactivada",
   membershipRemoved: "Usuario quitado de la organización",
   roleUpdated: "Rol actualizado",
+  staffCreated: "Super Usuario creado",
+  staffActivated: "Super Usuario reactivado",
+  staffDeactivated: "Super Usuario desactivado",
+  staffPasswordReset: "Contraseña actualizada",
 };
 
 export default function AdminToastListener() {
@@ -24,17 +28,22 @@ export default function AdminToastListener() {
 
   useEffect(() => {
     const toastKey = searchParams.get("toast");
-    if (!toastKey) {
+    const errorMessage = searchParams.get("error");
+    if (!toastKey && !errorMessage) {
       return;
     }
 
-    const message = messages[toastKey];
+    const message = toastKey ? messages[toastKey] : undefined;
     if (message) {
       toast.success(message);
+    }
+    if (errorMessage) {
+      toast.error(errorMessage);
     }
 
     const params = new URLSearchParams(searchParams.toString());
     params.delete("toast");
+    params.delete("error");
     const nextUrl = params.size ? `${pathname}?${params}` : pathname;
     router.replace(nextUrl);
   }, [pathname, router, searchParams]);
